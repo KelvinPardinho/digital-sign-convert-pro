@@ -64,12 +64,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Removendo a senha antes de salvar no state
       const { password: _, ...safeUser } = foundUser
-      setUser(safeUser)
-      localStorage.setItem('convertUser', JSON.stringify(safeUser))
+      
+      // Ensure the plan is either 'free' or 'premium'
+      const userWithValidPlan = {
+        ...safeUser,
+        plan: safeUser.plan === 'premium' ? 'premium' : 'free'
+      } as User;
+      
+      setUser(userWithValidPlan)
+      localStorage.setItem('convertUser', JSON.stringify(userWithValidPlan))
       
       toast({
         title: 'Login realizado com sucesso',
-        description: `Bem-vindo de volta, ${safeUser.name}!`,
+        description: `Bem-vindo de volta, ${userWithValidPlan.name}!`,
       })
     } catch (error) {
       toast({
@@ -103,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email,
         password,
         name,
-        plan: 'free',
+        plan: 'free' as const,
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`
       }
       
