@@ -5,6 +5,7 @@ import { blogPosts } from "@/data/blog-posts";
 import { BlogHeader } from "@/components/blog/BlogHeader";
 import { FeaturedPost } from "@/components/blog/FeaturedPost";
 import { BlogPostCard } from "@/components/blog/BlogPostCard";
+import { BlogAd } from "@/components/blog/BlogAd";
 
 export default function Blog() {
   return (
@@ -23,12 +24,18 @@ export default function Blog() {
             </Card>
           </div>
           
+          {/* Ad for non-premium users */}
+          <BlogAd />
+          
           {/* Posts secundários */}
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {blogPosts.slice(1).map((post) => (
               <BlogPostCard key={post.slug} post={post} />
             ))}
           </div>
+          
+          {/* Bottom ad for non-premium users */}
+          <BlogAd />
         </div>
       </div>
     </Layout>

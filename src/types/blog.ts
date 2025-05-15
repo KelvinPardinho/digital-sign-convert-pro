@@ -16,3 +16,15 @@ export interface BlogPost {
   category: string;
   readingTime: number;
 }
+
+export interface BlogFormData {
+  title: string;
+  excerpt: string;
+  content: string;
+  coverImage: string;
+  category: string;
+}
+
+export interface AdStatus {
+  showAds: boolean;
+}

@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Calendar, Clock, User, Facebook, Twitter, Linkedin, ArrowRight } from "lucide-react";
 import { blogPosts } from "@/data/blog-posts";
+import { BlogAd } from '@/components/blog/BlogAd';
 
 export default function BlogPost() {
   const { slug } = useParams<{ slug: string }>();
@@ -96,10 +97,16 @@ export default function BlogPost() {
             </div>
           </div>
           
+          {/* First ad for non-premium users */}
+          <BlogAd />
+          
           {/* Article content */}
           <article className="prose prose-lg dark:prose-invert max-w-none w-full">
             <div dangerouslySetInnerHTML={{ __html: post.content }} />
           </article>
+          
+          {/* Second ad for non-premium users */}
+          <BlogAd />
           
           {/* Article footer */}
           <div className="w-full border rounded-lg p-6 mt-8">

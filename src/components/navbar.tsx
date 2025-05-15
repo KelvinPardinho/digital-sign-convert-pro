@@ -46,6 +46,9 @@ export function Navbar() {
                 <Link to="/history" className="text-sm hover:text-primary transition-colors">
                   Histórico
                 </Link>
+                <Link to="/blog" className="text-sm hover:text-primary transition-colors">
+                  Blog
+                </Link>
               </div>
               <div className="flex items-center gap-4">
                 <ThemeToggle />
@@ -74,6 +77,14 @@ export function Navbar() {
                         </span>
                       </DropdownMenuItem>
                     </Link>
+                    {user.isAdmin && (
+                      <Link to="/admin/blog">
+                        <DropdownMenuItem>
+                          <FileText className="mr-2 h-4 w-4" />
+                          Admin Blog
+                        </DropdownMenuItem>
+                      </Link>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={signOut}>
                       <LogOut className="mr-2 h-4 w-4" />
@@ -91,6 +102,9 @@ export function Navbar() {
                 </Link>
                 <Link to="/features" className="text-sm hover:text-primary transition-colors">
                   Recursos
+                </Link>
+                <Link to="/blog" className="text-sm hover:text-primary transition-colors">
+                  Blog
                 </Link>
               </div>
               <div className="flex items-center gap-4">
@@ -133,6 +147,9 @@ export function Navbar() {
                 <Link to="/history" className="py-2" onClick={() => setIsOpen(false)}>
                   Histórico
                 </Link>
+                <Link to="/blog" className="py-2" onClick={() => setIsOpen(false)}>
+                  Blog
+                </Link>
                 <Link to="/profile" className="py-2" onClick={() => setIsOpen(false)}>
                   Perfil
                 </Link>
@@ -142,6 +159,11 @@ export function Navbar() {
                     {user.plan === 'premium' ? 'Premium' : 'Grátis'}
                   </span>
                 </Link>
+                {user.isAdmin && (
+                  <Link to="/admin/blog" className="py-2" onClick={() => setIsOpen(false)}>
+                    Admin Blog
+                  </Link>
+                )}
                 <button onClick={() => { signOut(); setIsOpen(false); }} className="py-2 text-left text-destructive">
                   Sair
                 </button>
@@ -153,6 +175,9 @@ export function Navbar() {
                 </Link>
                 <Link to="/features" className="py-2" onClick={() => setIsOpen(false)}>
                   Recursos
+                </Link>
+                <Link to="/blog" className="py-2" onClick={() => setIsOpen(false)}>
+                  Blog
                 </Link>
                 <Link to="/login" className="py-2" onClick={() => setIsOpen(false)}>
                   Entrar

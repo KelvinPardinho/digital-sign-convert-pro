@@ -14,6 +14,7 @@ import Converter from "./pages/converter";
 import Sign from "./pages/sign";
 import Blog from "./pages/blog";
 import BlogPost from "./pages/blog/[slug]";
+import AdminBlog from "./pages/admin/blog";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => (
               <Route path="/sign" element={<Sign />} />
               <Route path="/blog" element={<Blog />} />
               <Route path="/blog/:slug" element={<BlogPost />} />
+              <Route path="/admin/blog" element={<AdminBlog />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
