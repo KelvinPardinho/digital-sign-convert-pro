@@ -1,6 +1,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { useToast } from '@/components/ui/use-toast'
+import { supabase } from '@/integrations/supabase/client'
 
 // Tipos para nosso contexto de autenticação
 export interface User {
@@ -9,6 +10,7 @@ export interface User {
   name: string
   avatar?: string
   plan: 'free' | 'premium'
+  isAdmin?: boolean // Added isAdmin property to fix TypeScript errors
 }
 
 interface AuthContextType {
@@ -68,7 +70,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Ensure the plan is either 'free' or 'premium'
       const userWithValidPlan = {
         ...safeUser,
-        plan: safeUser.plan === 'premium' ? 'premium' : 'free'
+        plan: safeUser.plan === 'premium' ? 'premium' : 'free',
+        isAdmin: safeUser.isAdmin || false // Ensure isAdmin is defined
       } as User;
       
       setUser(userWithValidPlan)
@@ -111,6 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         password,
         name,
         plan: 'free' as const,
+        isAdmin: false, // Set default isAdmin value
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`
       }
       
