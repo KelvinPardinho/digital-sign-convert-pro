@@ -16,6 +16,10 @@ import Blog from "./pages/blog";
 import BlogPost from "./pages/blog/[slug]";
 import AdminBlog from "./pages/admin/blog";
 import NotFound from "./pages/NotFound";
+import History from "./pages/history";
+import Subscription from "./pages/subscription";
+import CertManager from "./pages/cert-manager";
+import Merge from "./pages/merge";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +41,10 @@ const App = () => (
               <Route path="/blog" element={<Blog />} />
               <Route path="/blog/:slug" element={<BlogPost />} />
               <Route path="/admin/blog" element={<AdminBlog />} />
+              <Route path="/history" element={<History />} />
+              <Route path="/subscription" element={<Subscription />} />
+              <Route path="/cert-manager" element={<CertManager />} />
+              <Route path="/merge" element={<Merge />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

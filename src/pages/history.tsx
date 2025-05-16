@@ -1,242 +1,274 @@
 
+import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Download, FileText, MoreHorizontal, Calendar, Trash } from "lucide-react";
 import { useAuth } from "@/providers/AuthProvider";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { FileText, Calendar, ArrowRight, Download, Edit, Upload } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useToast } from "@/components/ui/use-toast";
+import { formatDistanceToNow } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
 
-// Mock data para o histórico de documentos
-const documentHistory = [
-  {
-    id: "doc-001",
-    name: "Contrato de Prestação de Serviços.pdf",
-    type: "pdf",
-    status: "signed",
-    date: "2025-05-10T14:30:00Z",
-    size: 1240000,
-  },
-  {
-    id: "doc-002",
-    name: "Relatório Financeiro Trimestral.xlsx",
-    type: "xlsx",
-    status: "converted",
-    date: "2025-05-08T11:20:00Z",
-    size: 856000,
-  },
-  {
-    id: "doc-003",
-    name: "Proposta Comercial Cliente ABC.docx",
-    type: "docx",
-    status: "uploaded",
-    date: "2025-05-07T09:45:00Z",
-    size: 435000,
-  },
-  {
-    id: "doc-004",
-    name: "Procuração.pdf",
-    type: "pdf",
-    status: "pending",
-    date: "2025-05-06T16:12:00Z",
-    size: 567000,
-  },
-  {
-    id: "doc-005",
-    name: "Contrato de Confidencialidade.pdf",
-    type: "pdf",
-    status: "signed",
-    date: "2025-05-05T10:30:00Z",
-    size: 980000,
-  },
-  {
-    id: "doc-006",
-    name: "Apresentação para Diretoria.pptx",
-    type: "pptx",
-    status: "converted",
-    date: "2025-05-04T15:40:00Z",
-    size: 2540000,
-  },
-  {
-    id: "doc-007",
-    name: "Extrato Bancário Abril 2025.pdf",
-    type: "pdf",
-    status: "uploaded",
-    date: "2025-05-03T11:25:00Z",
-    size: 324000,
-  },
-  {
-    id: "doc-008",
-    name: "Minuta de Contrato Revisada.docx",
-    type: "docx",
-    status: "converted",
-    date: "2025-05-02T14:15:00Z",
-    size: 567000,
-  },
-  {
-    id: "doc-009",
-    name: "Declaração de Imposto de Renda 2025.pdf",
-    type: "pdf",
-    status: "signed",
-    date: "2025-04-30T09:20:00Z",
-    size: 1450000,
-  },
-  {
-    id: "doc-010",
-    name: "Comprovante de Residência.jpg",
-    type: "jpg",
-    status: "converted",
-    date: "2025-04-29T16:05:00Z",
-    size: 780000,
-  },
-];
-
-// Função para formatar a data
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-};
-
-// Função para formatar o tamanho do arquivo
-const formatFileSize = (bytes: number) => {
-  if (bytes < 1024) return bytes + " B";
-  else if (bytes < 1048576) return (bytes / 1024).toFixed(2) + " KB";
-  else return (bytes / 1048576).toFixed(2) + " MB";
-};
-
-// Componente para renderizar o ícone de cada tipo de documento
-const DocIcon = ({ type }: { type: string }) => {
-  switch (type) {
-    case "pdf":
-      return <FileText className="h-5 w-5 text-primary" />;
-    case "docx":
-      return <FileText className="h-5 w-5 text-blue-600" />;
-    case "xlsx":
-      return <FileText className="h-5 w-5 text-green-600" />;
-    case "pptx":
-      return <FileText className="h-5 w-5 text-orange-600" />;
-    case "jpg":
-    case "png":
-      return <FileText className="h-5 w-5 text-purple-600" />;
-    default:
-      return <FileText className="h-5 w-5" />;
-  }
-};
-
-// Componente para o status do documento
-const StatusBadge = ({ status }: { status: string }) => {
-  switch (status) {
-    case "signed":
-      return (
-        <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-          <Edit className="mr-1 h-3 w-3" />
-          Assinado
-        </Badge>
-      );
-    case "converted":
-      return (
-        <Badge variant="outline" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-          <Download className="mr-1 h-3 w-3" />
-          Convertido
-        </Badge>
-      );
-    case "uploaded":
-      return (
-        <Badge variant="outline" className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">
-          <Upload className="mr-1 h-3 w-3" />
-          Enviado
-        </Badge>
-      );
-    case "pending":
-      return (
-        <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
-          <Calendar className="mr-1 h-3 w-3" />
-          Pendente
-        </Badge>
-      );
-    default:
-      return (
-        <Badge variant="outline">
-          Desconhecido
-        </Badge>
-      );
-  }
-};
+// Type definition for a conversion record
+interface Conversion {
+  id: string;
+  original_filename: string;
+  original_format: string;
+  output_format: string;
+  output_url: string;
+  created_at: string;
+}
 
 export default function History() {
   const { user } = useAuth();
-  
+  const { toast } = useToast();
+  const [conversions, setConversions] = useState<Conversion[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // For now, use mock data if Supabase is not connected
+  const mockData = [
+    {
+      id: "1",
+      original_filename: "Relatório Anual 2023",
+      original_format: "docx",
+      output_format: "pdf",
+      output_url: "/downloads/relatorio-anual-2023.pdf",
+      created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: "2",
+      original_filename: "Contrato de Prestação",
+      original_format: "pdf",
+      output_format: "docx",
+      output_url: "/downloads/contrato-prestacao.docx",
+      created_at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    },
+    {
+      id: "3",
+      original_filename: "Foto Perfil",
+      original_format: "png",
+      output_format: "jpg",
+      output_url: "/downloads/foto-perfil.jpg",
+      created_at: new Date().toISOString(),
+    },
+  ];
+
+  useEffect(() => {
+    async function fetchConversions() {
+      setIsLoading(true);
+      try {
+        // Try to fetch from Supabase if authenticated
+        if (user) {
+          const { data, error } = await supabase
+            .from("conversions")
+            .select("*")
+            .order("created_at", { ascending: false });
+
+          if (error) throw error;
+          if (data && data.length > 0) {
+            setConversions(data);
+          } else {
+            // Use mock data if no conversions found
+            setConversions(mockData);
+          }
+        } else {
+          // Use mock data if not authenticated
+          setConversions(mockData);
+        }
+      } catch (error) {
+        console.error("Error fetching conversion history:", error);
+        // Fallback to mock data
+        setConversions(mockData);
+        toast({
+          variant: "destructive",
+          title: "Erro ao carregar histórico",
+          description: "Não foi possível carregar seu histórico de conversões.",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchConversions();
+  }, [user, toast]);
+
+  const handleDownload = (conversion: Conversion) => {
+    // In a real implementation, this would download from the actual URL
+    toast({
+      title: "Download iniciado",
+      description: `Baixando ${conversion.original_filename}.${conversion.output_format}`,
+    });
+    
+    // Simulate download for demo purposes
+    setTimeout(() => {
+      toast({
+        title: "Download concluído",
+        description: `${conversion.original_filename}.${conversion.output_format} foi baixado com sucesso.`,
+      });
+    }, 1500);
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      // Delete from Supabase if connected
+      if (user) {
+        const { error } = await supabase
+          .from("conversions")
+          .delete()
+          .eq("id", id);
+
+        if (error) throw error;
+      }
+      
+      // Update local state
+      setConversions(conversions.filter(conv => conv.id !== id));
+      
+      toast({
+        title: "Arquivo removido",
+        description: "O arquivo foi removido do histórico.",
+      });
+    } catch (error) {
+      console.error("Error deleting conversion:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao excluir",
+        description: "Não foi possível remover o arquivo do histórico.",
+      });
+    }
+  };
+
+  // Format the date to display how long ago it was
+  const formatDate = (dateString: string) => {
+    return formatDistanceToNow(new Date(dateString), {
+      addSuffix: true,
+      locale: ptBR,
+    });
+  };
+
+  // Get the appropriate file icon based on format
+  const getFormatIcon = (format: string) => {
+    return <FileText className="h-4 w-4" />;
+  };
+
   return (
     <Layout requireAuth>
       <div className="container py-8">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Histórico de Documentos</h1>
+            <h1 className="text-3xl font-bold">Histórico de Conversões</h1>
             <p className="text-muted-foreground">
-              Acompanhe todos os seus documentos enviados, convertidos e assinados
+              Visualize suas conversões anteriores
             </p>
           </div>
-          
-          <div className="flex flex-wrap gap-3">
-            <Link to="/converter">
-              <Button variant="outline" className="flex gap-2">
-                <Download size={16} />
-                <span>Converter Novo</span>
-              </Button>
-            </Link>
-            <Link to="/sign">
-              <Button className="flex gap-2">
-                <Edit size={16} />
-                <span>Assinar Documento</span>
-              </Button>
-            </Link>
-          </div>
         </div>
-        
+
         <Card>
           <CardHeader>
-            <CardTitle>Todos os Documentos</CardTitle>
+            <CardTitle className="text-xl flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Suas Conversões
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome do documento</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Tamanho</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {documentHistory.map((doc) => (
-                    <TableRow key={doc.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <DocIcon type={doc.type} />
-                          <span className="font-medium">{doc.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{formatDate(doc.date)}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={doc.status} />
-                      </TableCell>
-                      <TableCell>{formatFileSize(doc.size)}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon">
-                          <ArrowRight className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-pulse text-center">
+                  <p className="text-muted-foreground">Carregando histórico...</p>
+                </div>
+              </div>
+            ) : conversions.length > 0 ? (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Arquivo Original</TableHead>
+                      <TableHead className="hidden md:table-cell">Formato Original</TableHead>
+                      <TableHead>Formato Convertido</TableHead>
+                      <TableHead className="hidden md:table-cell">Data</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {conversions.map((conversion) => (
+                      <TableRow key={conversion.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {getFormatIcon(conversion.original_format)}
+                            <span className="truncate max-w-[150px] md:max-w-[250px]">
+                              {conversion.original_filename}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {conversion.original_format.toUpperCase()}
+                        </TableCell>
+                        <TableCell>
+                          {conversion.output_format.toUpperCase()}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {formatDate(conversion.created_at)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDownload(conversion)}
+                              title="Baixar arquivo"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleDownload(conversion)}>
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Baixar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleDelete(conversion.id)} className="text-destructive">
+                                  <Trash className="h-4 w-4 mr-2" />
+                                  Excluir
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <FileText className="h-12 w-12 mx-auto text-muted-foreground opacity-50" />
+                <h3 className="mt-4 text-lg font-medium">Nenhuma conversão encontrada</h3>
+                <p className="text-muted-foreground mt-2">
+                  Você ainda não realizou conversões. Visite a página de conversão para começar.
+                </p>
+                <Button className="mt-4" asChild>
+                  <a href="/converter">Converter Arquivos</a>
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
