@@ -71,14 +71,18 @@ export default function PDFMerge() {
 
     try {
       // We need to dynamically import pdfMake to handle browser-specific loading
-      // Use a more generic approach that works with bundlers
       const pdfMakeModule = await import('pdfmake/build/pdfmake');
       
       // Need to import vfs_fonts separately
-      await import('pdfmake/build/vfs_fonts');
+      const vfsFontsModule = await import('pdfmake/build/vfs_fonts');
       
-      // Get the default export from the module
+      // Use the module's default export
       const pdfMake = pdfMakeModule.default || pdfMakeModule;
+      
+      // Set up fonts
+      if (vfsFontsModule.default && vfsFontsModule.default.pdfMake) {
+        pdfMake.vfs = vfsFontsModule.default.pdfMake.vfs;
+      }
 
       const pdfDocs = await Promise.all(
         files.map(async (fileObj) => {
@@ -108,11 +112,8 @@ export default function PDFMerge() {
         })),
       };
 
-      // Type assertion to avoid TypeScript errors
-      const pdfDoc = (pdfMake as any).createPdf(docDefinition);
-      
-      // Use download method instead of manually creating a blob
-      pdfDoc.download(outputName);
+      // Use download method directly
+      pdfMake.createPdf(docDefinition).download(outputName);
       
       setIsProcessing(false);
     } catch (error) {

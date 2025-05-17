@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -50,9 +51,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const fetchUserDetails = async (userId: string) => {
     try {
-      // Get the user's profile information from the profiles table
+      // Get the user's profile information from the users table instead of profiles
       const { data: userData, error: userError } = await supabase
-        .from('profiles')
+        .from('users')
         .select('email, plan, is_admin')
         .eq('id', userId)
         .single();
@@ -116,12 +117,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
 
       if (data.user?.id) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([{ id: data.user.id, email, name }]);
+        const { error: userError } = await supabase
+          .from('users')
+          .insert([{ id: data.user.id, email, plan: 'free', is_admin: false }]);
 
-        if (profileError) {
-          throw profileError;
+        if (userError) {
+          throw userError;
         }
       }
 
