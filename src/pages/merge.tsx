@@ -4,7 +4,7 @@ import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useDropzone } from "react-dropzone";
-import { Download, File, Trash2 } from "lucide-react";
+import { File, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { v4 as uuidv4 } from 'uuid';
 import { FilesActionButton } from "@/components/pdf-merge/FilesActionButton";
@@ -70,13 +70,15 @@ export default function PDFMerge() {
     setIsProcessing(true);
 
     try {
-      // Fix for the pdfMake typing issues
-      const pdfMakeModule = await import("pdfmake/build/pdfmake");
-      const pdfFontsModule = await import("pdfmake/build/vfs_fonts");
+      // We need to dynamically import pdfMake to handle browser-specific loading
+      // Use a more generic approach that works with bundlers
+      const pdfMakeModule = await import('pdfmake/build/pdfmake');
       
-      // Use type assertion to fix the TypeScript error
-      const pdfMake = pdfMakeModule.default;
-      pdfMake.vfs = (pdfFontsModule.default as any).pdfMake.vfs;
+      // Need to import vfs_fonts separately
+      await import('pdfmake/build/vfs_fonts');
+      
+      // Get the default export from the module
+      const pdfMake = pdfMakeModule.default || pdfMakeModule;
 
       const pdfDocs = await Promise.all(
         files.map(async (fileObj) => {
@@ -106,30 +108,13 @@ export default function PDFMerge() {
         })),
       };
 
-      // Use type assertion to fix the TypeScript error
-      const pdfDoc = (pdfMake as any).createPdfKitDocument(docDefinition);
-      const chunks: Uint8Array[] = [];
-
-      pdfDoc.on("data", (chunk: Uint8Array) => {
-        chunks.push(chunk);
-      });
-
-      pdfDoc.on("end", () => {
-        const pdfBlob = new Blob(chunks, { type: "application/pdf" });
-        const pdfUrl = URL.createObjectURL(pdfBlob);
-
-        const link = document.createElement("a");
-        link.href = pdfUrl;
-        link.download = outputName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        URL.revokeObjectURL(pdfUrl);
-        setIsProcessing(false);
-      });
-
-      pdfDoc.end();
+      // Type assertion to avoid TypeScript errors
+      const pdfDoc = (pdfMake as any).createPdf(docDefinition);
+      
+      // Use download method instead of manually creating a blob
+      pdfDoc.download(outputName);
+      
+      setIsProcessing(false);
     } catch (error) {
       console.error("Erro ao juntar PDFs:", error);
       toast({

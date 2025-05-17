@@ -55,7 +55,7 @@ export function Navbar() {
                 <DropdownMenuGroup>
                   <DropdownMenuItem asChild>
                     <Link to="/dashboard">
-                      <User className="mr-2 h-4 w-4" />
+                      <UserIcon className="mr-2 h-4 w-4" />
                       <span>Dashboard</span>
                     </Link>
                   </DropdownMenuItem>
@@ -63,7 +63,7 @@ export function Navbar() {
                     <Link to="/subscription">
                       <CreditCard className="mr-2 h-4 w-4" />
                       <span>Assinatura</span>
-                      {user.is_admin && (
+                      {user.plan && (
                         <DropdownMenuShortcut>
                           <Badge variant="outline" className="ml-2 text-xs">
                             {user.plan === "premium" ? "Premium" : "Free"}
