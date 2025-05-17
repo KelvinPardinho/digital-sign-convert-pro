@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -69,9 +70,13 @@ export default function PDFMerge() {
     setIsProcessing(true);
 
     try {
-      const pdfMake = (await import("pdfmake/build/pdfmake")).default;
-      const pdfFonts = (await import("pdfmake/build/vfs_fonts")).default;
-      pdfMake.vfs = pdfFonts.pdfMake.vfs;
+      // Fix for the pdfMake typing issues
+      const pdfMakeModule = await import("pdfmake/build/pdfmake");
+      const pdfFontsModule = await import("pdfmake/build/vfs_fonts");
+      
+      // Use type assertion to fix the TypeScript error
+      const pdfMake = pdfMakeModule.default;
+      pdfMake.vfs = (pdfFontsModule.default as any).pdfMake.vfs;
 
       const pdfDocs = await Promise.all(
         files.map(async (fileObj) => {
@@ -101,7 +106,8 @@ export default function PDFMerge() {
         })),
       };
 
-      const pdfDoc = pdfMake.createPdfKitDocument(docDefinition);
+      // Use type assertion to fix the TypeScript error
+      const pdfDoc = (pdfMake as any).createPdfKitDocument(docDefinition);
       const chunks: Uint8Array[] = [];
 
       pdfDoc.on("data", (chunk: Uint8Array) => {

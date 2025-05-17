@@ -14,9 +14,9 @@ import {
   DropdownMenuShortcut,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { LogOut, User, CreditCard, Clock, FileText } from "lucide-react";
+import { LogOut, User as UserIcon, CreditCard, Clock, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { User as AuthUser } from "@/types/auth";
+import { User } from "@/types/auth";
 
 export function Navbar() {
   const { user, signOut } = useAuth();

@@ -1,24 +1,18 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { User } from "@/types/auth";
 
 type Plan = "free" | "premium";
-
-interface User {
-  id: string;
-  email: string;
-  plan: Plan;
-  is_admin?: boolean;
-}
 
 interface AuthState {
   user: User | null;
   loading: boolean;
-  isLoading: boolean; // Added this to fix TypeScript errors
+  isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
-  refreshUser: () => Promise<void>;  // New function
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -67,10 +61,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (userError) throw userError;
 
       if (userData) {
+        const authResponse = await supabase.auth.getUser();
+        const authUser = authResponse.data.user;
+        
         const fullUser: User = {
           id: userId,
           email: userData.email,
-          plan: userData.plan as Plan || "free",
+          user_metadata: authUser?.user_metadata || {},
+          plan: userData.plan || "free",
           is_admin: userData.is_admin || false,
         };
         
@@ -205,7 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const authContextValue: AuthState = {
     user,
     loading,
-    isLoading: loading, // Added this to fix TypeScript errors
+    isLoading: loading,
     signIn,
     signUp,
     signOut,
