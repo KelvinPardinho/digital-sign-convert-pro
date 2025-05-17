@@ -1,4 +1,3 @@
-
 import { Layout } from "@/components/layout";
 import { useAuth } from "@/providers/AuthProvider";
 import {
@@ -28,6 +27,7 @@ import {
   Lock,
   Files,
 } from "lucide-react";
+import { UserCard } from "@/components/dashboard/UserCard";
 
 // Dados simulados para o dashboard
 const mockData = {
@@ -142,264 +142,247 @@ export default function Dashboard() {
   return (
     <Layout requireAuth>
       <div className="container py-8">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
-          <div>
+        <div className="flex flex-col gap-8">
+          <div className="grid gap-6">
             <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">
-              Bem-vindo, {user?.name}! Gerencie seus documentos aqui.
-            </p>
+            <UserCard />
           </div>
-          
-          <div className="flex flex-wrap gap-3">
-            <Link to="/converter">
-              <Button variant="outline" className="flex gap-2">
-                <Download size={16} />
-                <span>Converter</span>
-              </Button>
-            </Link>
-            <Link to="/sign">
-              <Button className="flex gap-2">
-                <Edit size={16} />
-                <span>Assinar Documentos</span>
-              </Button>
-            </Link>
+
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Documentos Enviados
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold">{stats.uploaded}</div>
+                  <Upload className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Documentos Convertidos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold">{stats.converted}</div>
+                  <Download className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Documentos Assinados
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold">{stats.signed}</div>
+                  <Edit className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Assinaturas Pendentes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center justify-between">
+                  <div className="text-2xl font-bold">{stats.pending}</div>
+                  <Clock className="h-5 w-5 text-muted-foreground" />
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Documentos Enviados
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold">{stats.uploaded}</div>
-                <Upload className="h-5 w-5 text-muted-foreground" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Documentos Convertidos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold">{stats.converted}</div>
-                <Download className="h-5 w-5 text-muted-foreground" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Documentos Assinados
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold">{stats.signed}</div>
-                <Edit className="h-5 w-5 text-muted-foreground" />
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Assinaturas Pendentes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold">{stats.pending}</div>
-                <Clock className="h-5 w-5 text-muted-foreground" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+          {user?.plan === 'free' && (
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle className="text-lg">Limite de Uso</CardTitle>
+                <CardDescription>
+                  Você utilizou {stats.uploaded} de {freeLimit} documentos no plano gratuito.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <Progress value={usagePct} />
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>
+                      {stats.uploaded}/{freeLimit} documentos
+                    </span>
+                    <Link to="/subscription">
+                      <Button variant="outline" size="sm" className="flex items-center gap-1">
+                        <Lock size={14} />
+                        <span>Atualizar para Premium</span>
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-        {user?.plan === 'free' && (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="text-lg">Limite de Uso</CardTitle>
-              <CardDescription>
-                Você utilizou {stats.uploaded} de {freeLimit} documentos no plano gratuito.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <Progress value={usagePct} />
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>
-                    {stats.uploaded}/{freeLimit} documentos
-                  </span>
-                  <Link to="/subscription">
-                    <Button variant="outline" size="sm" className="flex items-center gap-1">
-                      <Lock size={14} />
-                      <span>Atualizar para Premium</span>
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Documentos Recentes</CardTitle>
+                <CardDescription>
+                  Seus documentos dos últimos 30 dias
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {recentDocuments.map((doc) => (
+                    <div key={doc.id} className="flex items-start justify-between">
+                      <div className="flex items-start gap-2">
+                        <div className="mt-1">
+                          <DocIcon type={doc.type} />
+                        </div>
+                        <div>
+                          <div className="font-medium truncate max-w-[280px]">
+                            {doc.name}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <StatusBadge status={doc.status} />
+                            <span className="text-xs text-muted-foreground">
+                              {formatDate(doc.date)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="icon">
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-6 text-center">
+                  <Link to="/history">
+                    <Button variant="outline">
+                      Ver todos os documentos
                     </Button>
                   </Link>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              </CardContent>
+            </Card>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Documentos Recentes</CardTitle>
-              <CardDescription>
-                Seus documentos dos últimos 30 dias
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {recentDocuments.map((doc) => (
-                  <div key={doc.id} className="flex items-start justify-between">
-                    <div className="flex items-start gap-2">
-                      <div className="mt-1">
-                        <DocIcon type={doc.type} />
+            <Card>
+              <CardHeader>
+                <CardTitle>Ações Rápidas</CardTitle>
+                <CardDescription>
+                  Funções mais utilizadas
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4">
+                  <Link to="/converter">
+                    <div className="doc-card">
+                      <div className="p-2 bg-primary/10 rounded-md w-fit">
+                        <Download className="h-5 w-5 text-primary" />
                       </div>
-                      <div>
-                        <div className="font-medium truncate max-w-[280px]">
-                          {doc.name}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <StatusBadge status={doc.status} />
-                          <span className="text-xs text-muted-foreground">
-                            {formatDate(doc.date)}
-                          </span>
-                        </div>
+                      <h3 className="font-medium">Converter</h3>
+                      <p className="text-sm text-muted-foreground">
+                        PDF ⬄ Word, Excel, Imagem
+                      </p>
+                    </div>
+                  </Link>
+                  
+                  <Link to="/sign">
+                    <div className="doc-card">
+                      <div className="p-2 bg-primary/10 rounded-md w-fit">
+                        <Edit className="h-5 w-5 text-primary" />
+                      </div>
+                      <h3 className="font-medium">Assinar</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Assinar documentos
+                      </p>
+                    </div>
+                  </Link>
+                  
+                  <Link to="/merge">
+                    <div className="doc-card">
+                      <div className="p-2 bg-primary/10 rounded-md w-fit">
+                        <Files className="h-5 w-5 text-primary" />
+                      </div>
+                      <h3 className="font-medium">Juntar PDFs</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Combinar vários PDFs
+                      </p>
+                    </div>
+                  </Link>
+                  
+                  <Link to="/cert-manager">
+                    <div className="doc-card">
+                      <div className="p-2 bg-primary/10 rounded-md w-fit">
+                        <Lock className="h-5 w-5 text-primary" />
+                      </div>
+                      <h3 className="font-medium">Certificados</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Gerenciar certificados
+                      </p>
+                    </div>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="mt-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Atividade</CardTitle>
+                <CardDescription>
+                  Estatísticas de uso nas últimas semanas
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="uploads" className="w-full">
+                  <TabsList className="mb-4">
+                    <TabsTrigger value="uploads">Envios</TabsTrigger>
+                    <TabsTrigger value="conversions">Conversões</TabsTrigger>
+                    <TabsTrigger value="signatures">Assinaturas</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="uploads" className="space-y-4">
+                    <div className="flex items-center">
+                      <div className="h-60 w-full flex items-center justify-center">
+                        <BarChart className="h-24 w-24 text-muted-foreground opacity-50" />
+                        <p className="text-muted-foreground ml-4">
+                          Estatísticas detalhadas disponíveis no MVP completo
+                        </p>
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon">
-                      <ArrowRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-6 text-center">
-                <Link to="/history">
-                  <Button variant="outline">
-                    Ver todos os documentos
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Ações Rápidas</CardTitle>
-              <CardDescription>
-                Funções mais utilizadas
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <Link to="/converter">
-                  <div className="doc-card">
-                    <div className="p-2 bg-primary/10 rounded-md w-fit">
-                      <Download className="h-5 w-5 text-primary" />
-                    </div>
-                    <h3 className="font-medium">Converter</h3>
-                    <p className="text-sm text-muted-foreground">
-                      PDF ⬄ Word, Excel, Imagem
-                    </p>
-                  </div>
-                </Link>
-                
-                <Link to="/sign">
-                  <div className="doc-card">
-                    <div className="p-2 bg-primary/10 rounded-md w-fit">
-                      <Edit className="h-5 w-5 text-primary" />
-                    </div>
-                    <h3 className="font-medium">Assinar</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Assinar documentos
-                    </p>
-                  </div>
-                </Link>
-                
-                <Link to="/merge">
-                  <div className="doc-card">
-                    <div className="p-2 bg-primary/10 rounded-md w-fit">
-                      <Files className="h-5 w-5 text-primary" />
-                    </div>
-                    <h3 className="font-medium">Juntar PDFs</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Combinar vários PDFs
-                    </p>
-                  </div>
-                </Link>
-                
-                <Link to="/cert-manager">
-                  <div className="doc-card">
-                    <div className="p-2 bg-primary/10 rounded-md w-fit">
-                      <Lock className="h-5 w-5 text-primary" />
-                    </div>
-                    <h3 className="font-medium">Certificados</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Gerenciar certificados
-                    </p>
-                  </div>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="mt-8">
-          <Card>
-            <CardHeader>
-              <CardTitle>Atividade</CardTitle>
-              <CardDescription>
-                Estatísticas de uso nas últimas semanas
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="uploads" className="w-full">
-                <TabsList className="mb-4">
-                  <TabsTrigger value="uploads">Envios</TabsTrigger>
-                  <TabsTrigger value="conversions">Conversões</TabsTrigger>
-                  <TabsTrigger value="signatures">Assinaturas</TabsTrigger>
-                </TabsList>
-                <TabsContent value="uploads" className="space-y-4">
-                  <div className="flex items-center">
-                    <div className="h-60 w-full flex items-center justify-center">
+                  </TabsContent>
+                  <TabsContent value="conversions" className="flex items-center justify-center h-[250px]">
+                    <div className="flex items-center">
                       <BarChart className="h-24 w-24 text-muted-foreground opacity-50" />
                       <p className="text-muted-foreground ml-4">
                         Estatísticas detalhadas disponíveis no MVP completo
                       </p>
                     </div>
-                  </div>
-                </TabsContent>
-                <TabsContent value="conversions" className="flex items-center justify-center h-[250px]">
-                  <div className="flex items-center">
-                    <BarChart className="h-24 w-24 text-muted-foreground opacity-50" />
-                    <p className="text-muted-foreground ml-4">
-                      Estatísticas detalhadas disponíveis no MVP completo
-                    </p>
-                  </div>
-                </TabsContent>
-                <TabsContent value="signatures" className="flex items-center justify-center h-[250px]">
-                  <div className="flex items-center">
-                    <BarChart className="h-24 w-24 text-muted-foreground opacity-50" />
-                    <p className="text-muted-foreground ml-4">
-                      Estatísticas detalhadas disponíveis no MVP completo
-                    </p>
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
+                  </TabsContent>
+                  <TabsContent value="signatures" className="flex items-center justify-center h-[250px]">
+                    <div className="flex items-center">
+                      <BarChart className="h-24 w-24 text-muted-foreground opacity-50" />
+                      <p className="text-muted-foreground ml-4">
+                        Estatísticas detalhadas disponíveis no MVP completo
+                      </p>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </Layout>

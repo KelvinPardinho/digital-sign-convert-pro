@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,8 @@ import { Separator } from "@/components/ui/separator";
 import { BlogPost, BlogFormData } from "@/types/blog";
 import { blogPosts } from "@/data/blog-posts";
 import { Pencil, Trash2, Plus } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@nextui-org/react";
+import { Link } from "react-router-dom";
 
 export default function AdminBlog() {
   const { user } = useAuth();
@@ -30,10 +31,23 @@ export default function AdminBlog() {
   });
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Redirect if not admin
-  if (user && !user.isAdmin) {
-    navigate("/");
-    return null;
+  // Check if the user is admin
+  if (!user || !user.is_admin) {
+    return (
+      <Layout>
+        <div className="container py-8">
+          <div className="flex flex-col items-center justify-center min-h-[60vh]">
+            <h1 className="text-2xl font-bold mb-4">Acesso Restrito</h1>
+            <p className="text-muted-foreground mb-8">
+              Esta página é restrita para administradores.
+            </p>
+            <Button asChild>
+              <Link to="/">Voltar para Home</Link>
+            </Button>
+          </div>
+        </div>
+      </Layout>
+    );
   }
 
   // If not logged in, redirected via Layout component
@@ -95,9 +109,9 @@ export default function AdminBlog() {
         coverImage: currentPost.coverImage,
         date: new Date().toISOString(),
         author: {
-          name: user?.name || "Admin",
+          name: user.user_metadata?.name || user.email,
           role: "Administrador",
-          avatar: user?.avatar || "/placeholder.svg"
+          avatar: user.user_metadata?.avatar || "/placeholder.svg"
         },
         category: currentPost.category,
         readingTime: Math.ceil(currentPost.content.split(' ').length / 200)
@@ -158,8 +172,21 @@ export default function AdminBlog() {
   };
 
   return (
-    <Layout requireAuth>
+    <Layout>
       <div className="container py-8">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Gerenciador de Blog</h1>
+            <p className="text-muted-foreground">
+              Bem-vindo, {user.user_metadata?.name || user.email}
+            </p>
+          </div>
+          <Avatar className="h-10 w-10">
+            <AvatarImage src={user.user_metadata?.avatar || ""} />
+            <AvatarFallback>{(user.user_metadata?.name || user.email || "").charAt(0).toUpperCase()}</AvatarFallback>
+          </Avatar>
+        </div>
+        
         <div className="flex flex-col gap-8">
           <div>
             <h1 className="text-3xl font-bold mb-2">Gerenciamento de Blog</h1>

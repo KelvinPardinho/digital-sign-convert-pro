@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -15,6 +14,7 @@ interface User {
 interface AuthState {
   user: User | null;
   loading: boolean;
+  isLoading: boolean; // Added this to fix TypeScript errors
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -205,6 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const authContextValue: AuthState = {
     user,
     loading,
+    isLoading: loading, // Added this to fix TypeScript errors
     signIn,
     signUp,
     signOut,
