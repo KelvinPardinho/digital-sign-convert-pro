@@ -13,7 +13,7 @@ import { Separator } from "@/components/ui/separator";
 import { BlogPost, BlogFormData } from "@/types/blog";
 import { blogPosts } from "@/data/blog-posts";
 import { Pencil, Trash2, Plus } from "lucide-react";
-import { Avatar, AvatarImage, AvatarFallback } from "@nextui-org/react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Link } from "react-router-dom";
 
 export default function AdminBlog() {

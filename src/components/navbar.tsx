@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/providers/AuthProvider";
@@ -15,8 +16,7 @@ import {
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { LogOut, User, CreditCard, Clock, FileText } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-// Add these imports if they don't exist
-import { User as SupabaseUser } from "@supabase/supabase-js";
+import { User as AuthUser } from "@/types/auth";
 
 export function Navbar() {
   const { user, signOut } = useAuth();
