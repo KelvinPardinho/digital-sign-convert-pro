@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
 import {
   Card,
@@ -10,88 +9,128 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/providers/AuthProvider";
-import { CheckCircle, CreditCard, FileText, Upload, CheckCheck, Lock } from "lucide-react";
+import { CheckCircle, CreditCard, FileText, CheckCheck, Lock, Loader2 } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Subscription() {
-  const { user, signIn } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { toast } = useToast();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [cardNumber, setCardNumber] = useState("");
-  const [cardName, setCardName] = useState("");
-  const [cardExpiry, setCardExpiry] = useState("");
-  const [cardCvc, setCardCvc] = useState("");
-  const [paymentTab, setPaymentTab] = useState("credit-card");
+  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "annual">("monthly");
 
-  // Format card number with spaces
-  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\s/g, "");
-    if (/^\d*$/.test(value) && value.length <= 16) {
-      // Format with spaces after every 4 digits
-      setCardNumber(
-        value.replace(/(\d{4})/g, "$1 ").trim()
-      );
-    }
-  };
-
-  // Format expiry date with slash
-  const handleExpiryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, "");
-    if (value.length <= 4) {
-      if (value.length > 2) {
-        setCardExpiry(`${value.slice(0, 2)}/${value.slice(2)}`);
-      } else {
-        setCardExpiry(value);
-      }
-    }
-  };
-
-  // Handle CVC input (numbers only)
-  const handleCvcChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/\D/g, "");
-    if (value.length <= 3) {
-      setCardCvc(value);
-    }
-  };
-
-  // Simulate payment processing
-  const handleSubscribe = async () => {
-    if (paymentTab === "credit-card" && (!cardNumber || !cardName || !cardExpiry || !cardCvc)) {
+  // Handle canceled payment
+  useEffect(() => {
+    const canceled = new URLSearchParams(location.search).get("canceled");
+    if (canceled) {
       toast({
-        variant: "destructive",
-        title: "Campos incompletos",
-        description: "Por favor, preencha todos os campos do cartão de crédito.",
+        title: "Pagamento cancelado",
+        description: "O processo de pagamento foi cancelado. Você pode tentar novamente quando quiser.",
       });
+      // Remove the query parameter
+      navigate("/subscription", { replace: true });
+    }
+  }, [location.search, toast, navigate]);
+
+  // Refresh subscription status when component mounts
+  useEffect(() => {
+    const checkSubscription = async () => {
+      if (!user) return;
+      
+      try {
+        setCheckingStatus(true);
+        const { error } = await supabase.functions.invoke('check-subscription');
+        
+        if (error) {
+          console.error("Error checking subscription:", error);
+        } else if (refreshUser) {
+          // Refresh user data to get updated plan
+          await refreshUser();
+        }
+      } catch (error) {
+        console.error("Error in subscription check:", error);
+      } finally {
+        setCheckingStatus(false);
+      }
+    };
+    
+    checkSubscription();
+  }, [user, refreshUser]);
+
+  // Start Stripe checkout
+  const handleSubscribe = async (plan: "free" | "premium") => {
+    if (plan === "free" || user?.plan === plan) return;
+    
+    if (!user) {
+      // Redirect to login first
+      navigate("/login?redirect=subscription");
       return;
     }
-
-    setIsLoading(true);
-
-    // Simulate payment processing delay
-    setTimeout(() => {
-      setIsLoading(false);
+    
+    try {
+      setIsLoading(true);
       
-      toast({
-        title: "Assinatura ativada com sucesso!",
-        description: "Seu plano Premium está ativo. Aproveite todos os recursos!",
+      // Call Stripe checkout edge function
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: { planType: billingPeriod }
       });
       
-      // Simulate upgrading user
-      const updatedUser = {
-        ...user!,
-        plan: "premium" as const
-      };
+      if (error) {
+        throw new Error(error.message);
+      }
       
-      // Save to localStorage for demo
-      localStorage.setItem("convertUser", JSON.stringify(updatedUser));
+      if (data?.url) {
+        // Redirect to Stripe checkout
+        window.location.href = data.url;
+      } else {
+        throw new Error("No checkout URL returned");
+      }
+    } catch (error) {
+      console.error("Error creating checkout:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao processar pagamento",
+        description: "Não foi possível iniciar o processo de pagamento. Por favor, tente novamente.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle customer portal for subscription management
+  const handleManageSubscription = async () => {
+    try {
+      setIsLoading(true);
       
-      // Redirect to dashboard after successful payment
-      window.location.href = "/dashboard";
-    }, 2000);
+      // Call customer portal edge function
+      const { data, error } = await supabase.functions.invoke('customer-portal');
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      if (data?.url) {
+        // Redirect to Stripe customer portal
+        window.location.href = data.url;
+      } else {
+        throw new Error("No portal URL returned");
+      }
+    } catch (error) {
+      console.error("Error accessing customer portal:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao acessar portal",
+        description: "Não foi possível acessar o portal de gerenciamento da assinatura. Por favor, tente novamente.",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -101,6 +140,16 @@ export default function Subscription() {
         <p className="text-muted-foreground mb-8">
           Selecione o plano ideal para você e aproveite todos os recursos
         </p>
+
+        {/* Billing period toggle */}
+        <div className="flex justify-center mb-8">
+          <Tabs value={billingPeriod} onValueChange={(v) => setBillingPeriod(v as "monthly" | "annual")}>
+            <TabsList>
+              <TabsTrigger value="monthly">Mensal</TabsTrigger>
+              <TabsTrigger value="annual">Anual (2 meses grátis)</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
         <div className="grid md:grid-cols-2 gap-8 mb-12">
           {/* Free Plan Card */}
@@ -159,8 +208,17 @@ export default function Subscription() {
               </CardTitle>
               <CardDescription>Para profissionais e empresas</CardDescription>
               <div className="mt-2">
-                <span className="text-3xl font-bold">R$19,90</span>
-                <span className="text-muted-foreground"> / mês</span>
+                <span className="text-3xl font-bold">
+                  {billingPeriod === "monthly" ? "R$19,90" : "R$199,00"}
+                </span>
+                <span className="text-muted-foreground">
+                  {" "}/{billingPeriod === "monthly" ? " mês" : " ano"}
+                </span>
+                {billingPeriod === "annual" && (
+                  <div className="text-sm text-green-600 dark:text-green-400 mt-1">
+                    Economize 16% em relação ao plano mensal
+                  </div>
+                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -188,23 +246,36 @@ export default function Subscription() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button 
-                className="w-full" 
-                disabled={user?.plan === "premium" || isLoading}
-                onClick={() => {
-                  if (user) {
-                    document.getElementById("payment-section")?.scrollIntoView({ behavior: "smooth" });
-                  } else {
-                    window.location.href = "/login?redirect=subscription";
-                  }
-                }}
-              >
-                {user?.plan === "premium" 
-                  ? "Plano Atual" 
-                  : user 
+              {user?.plan === "premium" ? (
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={handleManageSubscription}
+                  disabled={isLoading || checkingStatus}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Carregando...
+                    </>
+                  ) : "Gerenciar Assinatura"}
+                </Button>
+              ) : (
+                <Button 
+                  className="w-full" 
+                  onClick={() => handleSubscribe("premium")}
+                  disabled={isLoading || checkingStatus}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processando...
+                    </>
+                  ) : user 
                     ? "Assinar Agora" 
                     : "Login para Assinar"}
-              </Button>
+                </Button>
+              )}
             </CardFooter>
           </Card>
         </div>
@@ -257,140 +328,6 @@ export default function Subscription() {
           </div>
         </div>
 
-        {/* Payment section - only show if user is logged in and not premium */}
-        {user && user.plan !== "premium" && (
-          <div id="payment-section" className="scroll-mt-20">
-            <h2 className="text-2xl font-bold mb-6">Informações de Pagamento</h2>
-            
-            <Tabs value={paymentTab} onValueChange={setPaymentTab}>
-              <TabsList className="grid grid-cols-2 mb-6">
-                <TabsTrigger value="credit-card">Cartão de Crédito</TabsTrigger>
-                <TabsTrigger value="pix">PIX</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="credit-card">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <CreditCard className="h-5 w-5" />
-                      Pagamento por Cartão
-                    </CardTitle>
-                    <CardDescription>
-                      Digite os dados do seu cartão para completar a assinatura
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="card-number">Número do Cartão</Label>
-                      <Input
-                        id="card-number"
-                        placeholder="1234 5678 9012 3456"
-                        value={cardNumber}
-                        onChange={handleCardNumberChange}
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="card-name">Nome no Cartão</Label>
-                      <Input
-                        id="card-name"
-                        placeholder="João da Silva"
-                        value={cardName}
-                        onChange={(e) => setCardName(e.target.value)}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="expiry">Validade</Label>
-                        <Input
-                          id="expiry"
-                          placeholder="MM/AA"
-                          value={cardExpiry}
-                          onChange={handleExpiryChange}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="cvc">CVC</Label>
-                        <Input
-                          id="cvc"
-                          placeholder="123"
-                          value={cardCvc}
-                          onChange={handleCvcChange}
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                  <CardFooter>
-                    <Button 
-                      className="w-full" 
-                      onClick={handleSubscribe}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? "Processando..." : "Finalizar Assinatura"}
-                    </Button>
-                  </CardFooter>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="pix">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <div className="h-5 w-5 flex items-center justify-center font-bold">P</div>
-                      Pagamento por PIX
-                    </CardTitle>
-                    <CardDescription>
-                      Escaneie o QR Code ou copie o código PIX para concluir o pagamento
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col items-center justify-center py-8">
-                    {/* Fake QR Code */}
-                    <div className="w-48 h-48 bg-gray-200 dark:bg-gray-800 flex items-center justify-center mb-4">
-                      <div className="w-32 h-32 border-2 border-current grid grid-cols-4 grid-rows-4 gap-1 p-2">
-                        {/* Simple QR code simulation */}
-                        {Array(16).fill(0).map((_, i) => (
-                          <div 
-                            key={i} 
-                            className={`${Math.random() > 0.6 ? "bg-current" : ""} w-full h-full`}
-                          ></div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div className="bg-muted p-4 rounded-md w-full mb-4 text-center">
-                      <p className="text-xs break-all select-all">
-                        00020126580014br.gov.bcb.pix0136a629534e-7368-4053-9014-0524d79187213
-                        5204000053039865802BR5925Convert Docs SA62070503***63042D2D
-                      </p>
-                    </div>
-                    
-                    <Button 
-                      variant="outline" 
-                      className="w-full mb-4"
-                      onClick={() => {
-                        navigator.clipboard.writeText("00020126580014br.gov.bcb.pix0136a629534e-7368-4053-9014-0524d79187213 5204000053039865802BR5925Convert Docs SA62070503***63042D2D");
-                        toast({
-                          title: "Código PIX copiado",
-                          description: "Cole no seu aplicativo de banco para concluir o pagamento.",
-                        });
-                      }}
-                    >
-                      Copiar código PIX
-                    </Button>
-                    
-                    <Button 
-                      className="w-full" 
-                      onClick={handleSubscribe}
-                      disabled={isLoading}
-                    >
-                      {isLoading ? "Processando..." : "Confirmar Pagamento"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
-        )}
-
         {/* FAQ Section */}
         <div className="mt-12">
           <h2 className="text-2xl font-bold mb-6">Perguntas Frequentes</h2>
@@ -399,28 +336,30 @@ export default function Subscription() {
             <div>
               <h3 className="text-lg font-medium mb-2">Como posso cancelar minha assinatura?</h3>
               <p className="text-muted-foreground">
-                Você pode cancelar sua assinatura a qualquer momento através da área de configurações da conta. O cancelamento será efetivo no final do período de cobrança atual.
+                Você pode cancelar sua assinatura a qualquer momento através do portal de gerenciamento de assinatura. 
+                O cancelamento será efetivo no final do período de cobrança atual.
               </p>
             </div>
             
             <div>
               <h3 className="text-lg font-medium mb-2">Quais formas de pagamento são aceitas?</h3>
               <p className="text-muted-foreground">
-                Aceitamos cartões de crédito Visa, Mastercard, American Express e pagamento via PIX para assinaturas mensais e anuais.
+                Aceitamos cartões de crédito Visa, Mastercard, American Express para assinaturas mensais e anuais.
               </p>
             </div>
             
             <div>
               <h3 className="text-lg font-medium mb-2">O que acontece se eu exceder o limite do plano gratuito?</h3>
               <p className="text-muted-foreground">
-                Quando você atingir o limite de 5 conversões no plano gratuito, será necessário aguardar até o próximo mês ou fazer upgrade para o plano premium para continuar utilizando o serviço.
+                Quando você atingir o limite de 5 conversões no plano gratuito, será necessário aguardar até o próximo mês 
+                ou fazer upgrade para o plano premium para continuar utilizando o serviço.
               </p>
             </div>
             
             <div>
               <h3 className="text-lg font-medium mb-2">O plano premium oferece algum desconto para pagamento anual?</h3>
               <p className="text-muted-foreground">
-                Sim! Ao optar pelo pagamento anual, você recebe 2 meses grátis, pagando apenas 10 meses pelo uso do serviço durante todo o ano.
+                Sim! Ao optar pelo pagamento anual, você recebe 2 meses grátis, economizando 16% em relação ao plano mensal.
               </p>
             </div>
           </div>

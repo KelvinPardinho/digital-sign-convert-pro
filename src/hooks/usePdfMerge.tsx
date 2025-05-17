@@ -2,11 +2,16 @@
 import React, { useState, useEffect } from "react";
 import { FileWithPreview } from "@/types/file";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/providers/AuthProvider";
 
 export function usePdfMerge() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Check if user is premium
+  const isPremium = user?.plan === "premium";
 
   // Move file up in the list
   const moveFileUp = (index: number) => {
@@ -45,7 +50,7 @@ export function usePdfMerge() {
   };
 
   // Handle file drop
-  const handleFileDrop = (isPremium: boolean) => (acceptedFiles: File[]) => {
+  const handleFileDrop = (acceptedFiles: File[]) => {
     // Check if user is premium for this feature
     if (!isPremium) {
       toast({
@@ -72,6 +77,16 @@ export function usePdfMerge() {
         variant: "destructive",
         title: "Arquivos insuficientes",
         description: "Você precisa de pelo menos 2 PDFs para realizar a junção."
+      });
+      return;
+    }
+    
+    // Verify premium status again
+    if (!isPremium) {
+      toast({
+        variant: "destructive",
+        title: "Recurso Premium",
+        description: "A junção de PDFs está disponível apenas para usuários Premium."
       });
       return;
     }
@@ -111,6 +126,7 @@ export function usePdfMerge() {
     removeFile,
     onDragEnd,
     handleFileDrop,
-    handleMerge
+    handleMerge,
+    isPremium
   };
 }
