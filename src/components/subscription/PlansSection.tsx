@@ -22,10 +22,11 @@ export function PlansSection({
   
   // Define free plan features
   const freePlanFeatures = [
-    { text: "5 conversões por mês", included: true },
-    { text: "Tamanho máximo: 5MB", included: true },
-    { text: "Formatos básicos suportados", included: true },
-    { text: "Sem assinatura digital", included: false },
+    { text: "Conversões ilimitadas", included: true },
+    { text: "Tamanho máximo: 10MB", included: true },
+    { text: "Todos os formatos suportados", included: true },
+    { text: "3 assinaturas digitais por mês", included: true },
+    { text: "Com anúncios", included: true },
     { text: "Sem junção de PDFs", included: false },
   ];
   
@@ -35,6 +36,7 @@ export function PlansSection({
     { text: "Tamanho máximo: 50MB", included: true },
     { text: "Todos os formatos suportados", included: true },
     { text: "Assinatura digital ilimitada", included: true },
+    { text: "Sem anúncios", included: true },
     { text: "Junção de PDFs ilimitada", included: true },
   ];
   
@@ -57,7 +59,7 @@ export function PlansSection({
       <PlanCard
         title="Plano Premium"
         description="Para profissionais e empresas"
-        price={billingPeriod === "monthly" ? "R$19,90" : "R$199,00"}
+        price={billingPeriod === "monthly" ? "R$29,90" : "R$299,00"}
         period={billingPeriod === "monthly" ? "mês" : "ano"}
         features={premiumPlanFeatures}
         isCurrentPlan={user?.plan === "premium"}

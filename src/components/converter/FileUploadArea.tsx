@@ -24,6 +24,8 @@ export function FileUploadArea({
   fileCount, 
   formats 
 }: FileUploadAreaProps) {
+  const maxFileSize = plan === 'premium' ? '50MB' : '10MB';
+  
   return (
     <div
       {...getRootProps()}
@@ -41,11 +43,9 @@ export function FileUploadArea({
         <p className="text-sm text-muted-foreground">
           Formatos aceitos: {formats}
         </p>
-        {plan === 'free' && (
-          <p className="text-xs text-muted-foreground mt-2">
-            Plano gratuito: {fileCount}/5 arquivos
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground mt-1">
+          Tamanho máximo: {maxFileSize}
+        </p>
       </div>
     </div>
   );

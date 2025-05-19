@@ -14,27 +14,32 @@ export function FeatureComparisonTable() {
           </thead>
           <tbody>
             <tr className="border-b">
-              <td className="py-4 px-4">Conversões mensais</td>
-              <td className="text-center py-4 px-4">5</td>
+              <td className="py-4 px-4">Conversões</td>
+              <td className="text-center py-4 px-4">Ilimitado</td>
               <td className="text-center py-4 px-4">Ilimitado</td>
             </tr>
             <tr className="border-b">
               <td className="py-4 px-4">Tamanho máximo do arquivo</td>
-              <td className="text-center py-4 px-4">5MB</td>
+              <td className="text-center py-4 px-4">10MB</td>
               <td className="text-center py-4 px-4">50MB</td>
             </tr>
             <tr className="border-b">
               <td className="py-4 px-4">Formatos suportados</td>
-              <td className="text-center py-4 px-4">Básicos</td>
+              <td className="text-center py-4 px-4">Todos</td>
               <td className="text-center py-4 px-4">Todos</td>
             </tr>
             <tr className="border-b">
-              <td className="py-4 px-4">Assinatura digital</td>
+              <td className="py-4 px-4">Assinatura digital por mês</td>
+              <td className="text-center py-4 px-4">3</td>
+              <td className="text-center py-4 px-4">Ilimitado</td>
+            </tr>
+            <tr className="border-b">
+              <td className="py-4 px-4">Junção de PDFs</td>
               <td className="text-center py-4 px-4">Não</td>
               <td className="text-center py-4 px-4">Sim</td>
             </tr>
             <tr className="border-b">
-              <td className="py-4 px-4">Junção de PDFs</td>
+              <td className="py-4 px-4">Sem anúncios</td>
               <td className="text-center py-4 px-4">Não</td>
               <td className="text-center py-4 px-4">Sim</td>
             </tr>

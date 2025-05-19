@@ -51,8 +51,8 @@ serve(async (req) => {
 
     // Set price based on plan type (monthly or annual)
     const price = planType === "annual" ? 
-      { unit_amount: 19900, recurring: { interval: "year" } } : 
-      { unit_amount: 1990, recurring: { interval: "month" } };
+      { unit_amount: 29900, recurring: { interval: "year" } } : 
+      { unit_amount: 2990, recurring: { interval: "month" } };
 
     // Create a subscription checkout session
     const session = await stripe.checkout.sessions.create({

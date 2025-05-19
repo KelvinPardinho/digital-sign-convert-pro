@@ -62,7 +62,7 @@ export default function SubscriptionSuccess() {
           </p>
           
           <p className="mt-2 text-muted-foreground">
-            Seu plano Premium já está ativo. Agora você tem acesso a todos os recursos exclusivos.
+            Seu plano Premium já está ativo. Agora você tem acesso a todos os recursos exclusivos, sem anúncios e sem limitações.
           </p>
           
           <div className="pt-8 space-y-4">

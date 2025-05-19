@@ -31,12 +31,28 @@ export function FromPdfTab({
   const { toast } = useToast();
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (userPlan === 'free' && files.length + acceptedFiles.length > 5) {
+    // Check file size limit based on user plan
+    const maxSize = userPlan === 'premium' ? 50 * 1024 * 1024 : 10 * 1024 * 1024; // 50MB or 10MB
+    
+    const oversizedFiles = acceptedFiles.filter(file => file.size > maxSize);
+    if (oversizedFiles.length > 0) {
+      const planText = userPlan === 'premium' ? 'Premium (50MB)' : 'Gratuito (10MB)';
       toast({
         variant: "destructive",
-        title: "Limite do plano gratuito",
-        description: "Você atingiu o limite de 5 arquivos. Faça upgrade para o plano premium.",
+        title: "Arquivo muito grande",
+        description: `Alguns arquivos excedem o limite de tamanho do plano ${planText}.`,
       });
+      
+      // Only add files that are under the size limit
+      const validFiles = acceptedFiles.filter(file => file.size <= maxSize);
+      if (validFiles.length === 0) return;
+      
+      setFiles(prevFiles => [
+        ...prevFiles,
+        ...validFiles.map(file => Object.assign(file, {
+          preview: URL.createObjectURL(file)
+        }))
+      ]);
       return;
     }
 
@@ -46,7 +62,7 @@ export function FromPdfTab({
         preview: URL.createObjectURL(file)
       }))
     ]);
-  }, [files.length, toast, userPlan, setFiles]);
+  }, [userPlan, toast, setFiles]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
     onDrop,

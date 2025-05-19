@@ -22,6 +22,19 @@ export function useFileConversion() {
       return;
     }
 
+    // Check file size limits based on user plan
+    const maxSize = user?.plan === 'premium' ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+    const oversizedFiles = files.filter(file => file.size > maxSize);
+    if (oversizedFiles.length > 0) {
+      const planText = user?.plan === 'premium' ? 'Premium (50MB)' : 'Gratuito (10MB)';
+      toast({
+        variant: "destructive",
+        title: "Arquivo muito grande",
+        description: `Alguns arquivos excedem o limite de tamanho do plano ${planText}.`,
+      });
+      return;
+    }
+
     setConverting(true);
     
     try {
