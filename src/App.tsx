@@ -22,6 +22,10 @@ import Subscription from "./pages/subscription";
 import SubscriptionSuccess from "./pages/subscription-success";
 import CertManager from "./pages/cert-manager";
 import Merge from "./pages/merge";
+import Split from "./pages/split";
+import Ocr from "./pages/ocr";
+import Protect from "./pages/protect";
+import Unlock from "./pages/unlock";
 
 const App = () => {
   // Create a new QueryClient instance inside the component
@@ -50,6 +54,10 @@ const App = () => {
                 <Route path="/subscription-success" element={<SubscriptionSuccess />} />
                 <Route path="/cert-manager" element={<CertManager />} />
                 <Route path="/merge" element={<Merge />} />
+                <Route path="/split" element={<Split />} />
+                <Route path="/ocr" element={<Ocr />} />
+                <Route path="/protect" element={<Protect />} />
+                <Route path="/unlock" element={<Unlock />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>

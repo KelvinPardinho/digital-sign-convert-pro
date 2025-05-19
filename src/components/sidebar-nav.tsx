@@ -19,11 +19,14 @@ import {
   FileText, 
   History, 
   FileSignature, 
-  FilePlus2, 
   CreditCard, 
-  Settings, 
   LogOut, 
-  Sparkles
+  Sparkles,
+  FilePlus2,
+  Split,
+  FileText as FileOcr,
+  Lock,
+  LockOpen
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -65,12 +68,35 @@ export function SidebarNav() {
       path: "/sign", 
       icon: FileSignature 
     },
-    { 
-      title: "Juntar PDFs", 
-      path: "/merge", 
+  ];
+
+  const pdfToolItems = [
+    {
+      title: "Juntar PDFs",
+      path: "/merge",
       icon: FilePlus2,
       isPremium: true
     },
+    {
+      title: "Dividir PDF",
+      path: "/split",
+      icon: Split
+    },
+    {
+      title: "OCR PDF",
+      path: "/ocr",
+      icon: FileOcr
+    },
+    {
+      title: "Proteger PDF",
+      path: "/protect",
+      icon: Lock
+    },
+    {
+      title: "Remover Senha PDF",
+      path: "/unlock",
+      icon: LockOpen
+    }
   ];
 
   return (
@@ -99,6 +125,23 @@ export function SidebarNav() {
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarMenu>
             {menuItems.map((item) => (
+              <SidebarMenuItem key={item.path}>
+                <SidebarMenuButton 
+                  isActive={isActivePath(item.path)}
+                  onClick={() => navigate(item.path)}
+                >
+                  <item.icon className="w-4 h-4" />
+                  <span>{item.title}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Ferramentas PDF</SidebarGroupLabel>
+          <SidebarMenu>
+            {pdfToolItems.map((item) => (
               <SidebarMenuItem key={item.path}>
                 <SidebarMenuButton 
                   isActive={isActivePath(item.path)}
