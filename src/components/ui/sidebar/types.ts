@@ -10,6 +10,11 @@ export type SidebarContext = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  SidebarProviderProps?: React.ComponentProps<"div"> & {
+    defaultOpen?: boolean
+    open?: boolean
+    onOpenChange?: (open: boolean) => void
+  }
 }
 
 export type SidebarVariant = "sidebar" | "floating" | "inset"

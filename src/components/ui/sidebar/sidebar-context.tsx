@@ -1,5 +1,6 @@
+
 import * as React from "react"
-import { SidebarContext, SidebarProviderProps } from "./types"
+import type { SidebarContext as SidebarContextType } from "./types"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
@@ -11,7 +12,7 @@ export const SIDEBAR_WIDTH_MOBILE = "18rem"
 export const SIDEBAR_WIDTH_ICON = "3rem"
 export const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
-const SidebarContext = React.createContext<SidebarContext | null>(null)
+const SidebarContext = React.createContext<SidebarContextType | null>(null)
 
 export function useSidebar() {
   const context = React.useContext(SidebarContext)
@@ -24,7 +25,7 @@ export function useSidebar() {
 
 export const SidebarProvider = React.forwardRef<
   HTMLDivElement,
-  SidebarProviderProps
+  SidebarContextType["SidebarProviderProps"]
 >(
   (
     {
@@ -85,7 +86,7 @@ export const SidebarProvider = React.forwardRef<
     // We add a state so that we can do data-state="expanded" or "collapsed"
     const state = open ? "expanded" : "collapsed"
 
-    const contextValue = React.useMemo<SidebarContext>(
+    const contextValue = React.useMemo<SidebarContextType>(
       () => ({
         state,
         open,
@@ -129,3 +130,4 @@ SidebarProvider.displayName = "SidebarProvider"
 function cn(...classes: any[]) {
   return classes.filter(Boolean).join(" ")
 }
+
