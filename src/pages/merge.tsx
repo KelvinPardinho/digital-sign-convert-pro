@@ -70,20 +70,22 @@ export default function PDFMerge() {
     setIsProcessing(true);
 
     try {
-      // We need to dynamically import pdfMake to handle browser-specific loading
+      // Import the modules
       const pdfMakeModule = await import('pdfmake/build/pdfmake');
+      const pdfFontsModule = await import('pdfmake/build/vfs_fonts');
       
-      // Need to import vfs_fonts separately
-      const vfsFontsModule = await import('pdfmake/build/vfs_fonts');
-      
-      // Use the module's default export
+      // Access the default export for pdfMake
       const pdfMake = pdfMakeModule.default || pdfMakeModule;
       
-      // Set up fonts
-      if (vfsFontsModule.default && vfsFontsModule.default.pdfMake) {
-        pdfMake.vfs = vfsFontsModule.default.pdfMake.vfs;
+      // Set vfs fonts correctly - access vfs directly, not through pdfMake property
+      if (pdfFontsModule.default && pdfFontsModule.default.pdfMake && pdfFontsModule.default.pdfMake.vfs) {
+        pdfMake.vfs = pdfFontsModule.default.pdfMake.vfs;
+      } else if (pdfFontsModule.pdfMake && pdfFontsModule.pdfMake.vfs) {
+        // Alternative access path if needed
+        pdfMake.vfs = pdfFontsModule.pdfMake.vfs;
       }
 
+      // Read PDF files as data URLs
       const pdfDocs = await Promise.all(
         files.map(async (fileObj) => {
           const file = fileObj.file;
@@ -105,6 +107,7 @@ export default function PDFMerge() {
         })
       );
 
+      // Define the document content
       const docDefinition = {
         content: pdfDocs.map((pdfData) => ({
           image: pdfData,
@@ -112,7 +115,7 @@ export default function PDFMerge() {
         })),
       };
 
-      // Use download method directly
+      // Generate and download PDF
       pdfMake.createPdf(docDefinition).download(outputName);
       
       setIsProcessing(false);
