@@ -30,6 +30,11 @@ export default function Subscription() {
       // Remove the query parameter
       navigate("/subscription", { replace: true });
     }
+    
+    const success = new URLSearchParams(location.search).get("success");
+    if (success) {
+      navigate("/subscription-success", { replace: true });
+    }
   }, [location.search, toast, navigate]);
 
   // Refresh subscription status when component mounts
@@ -42,20 +47,25 @@ export default function Subscription() {
         const { error } = await supabase.functions.invoke('check-subscription');
         
         if (error) {
-          console.error("Error checking subscription:", error);
+          console.error("Erro ao verificar assinatura:", error);
+          toast({
+            variant: "destructive",
+            title: "Erro ao verificar assinatura",
+            description: "Não foi possível verificar seu status de assinatura. Por favor, tente novamente mais tarde."
+          });
         } else if (refreshUser) {
           // Refresh user data to get updated plan
           await refreshUser();
         }
       } catch (error) {
-        console.error("Error in subscription check:", error);
+        console.error("Erro na verificação da assinatura:", error);
       } finally {
         setCheckingStatus(false);
       }
     };
     
     checkSubscription();
-  }, [user, refreshUser]);
+  }, [user, refreshUser, toast]);
 
   // Start Stripe checkout
   const handleSubscribe = async (plan: "free" | "premium") => {
@@ -83,10 +93,10 @@ export default function Subscription() {
         // Redirect to Stripe checkout
         window.location.href = data.url;
       } else {
-        throw new Error("No checkout URL returned");
+        throw new Error("URL de checkout não retornada");
       }
     } catch (error) {
-      console.error("Error creating checkout:", error);
+      console.error("Erro ao criar checkout:", error);
       toast({
         variant: "destructive",
         title: "Erro ao processar pagamento",
@@ -113,10 +123,10 @@ export default function Subscription() {
         // Redirect to Stripe customer portal
         window.location.href = data.url;
       } else {
-        throw new Error("No portal URL returned");
+        throw new Error("URL do portal não retornada");
       }
     } catch (error) {
-      console.error("Error accessing customer portal:", error);
+      console.error("Erro ao acessar portal:", error);
       toast({
         variant: "destructive",
         title: "Erro ao acessar portal",
@@ -128,7 +138,7 @@ export default function Subscription() {
   };
 
   return (
-    <Layout>
+    <Layout requireAuth>
       <div className="container py-8 max-w-4xl">
         <h1 className="text-3xl font-bold mb-2">Escolha seu plano</h1>
         <p className="text-muted-foreground mb-8">

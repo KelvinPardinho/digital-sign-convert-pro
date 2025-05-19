@@ -40,6 +40,11 @@ serve(async (req) => {
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     if (customers.data.length === 0) {
       // No customer found, user is on free plan
+      await supabaseAdmin
+        .from("users")
+        .update({ plan: "free" })
+        .eq("id", user.id);
+        
       return new Response(JSON.stringify({ 
         is_subscribed: false, 
         plan: "free" 

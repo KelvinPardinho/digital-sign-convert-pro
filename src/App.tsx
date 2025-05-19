@@ -19,6 +19,7 @@ import AdminBlog from "./pages/admin/blog";
 import NotFound from "./pages/NotFound";
 import History from "./pages/history";
 import Subscription from "./pages/subscription";
+import SubscriptionSuccess from "./pages/subscription-success";
 import CertManager from "./pages/cert-manager";
 import Merge from "./pages/merge";
 
@@ -46,6 +47,7 @@ const App = () => {
                 <Route path="/admin/blog" element={<AdminBlog />} />
                 <Route path="/history" element={<History />} />
                 <Route path="/subscription" element={<Subscription />} />
+                <Route path="/subscription-success" element={<SubscriptionSuccess />} />
                 <Route path="/cert-manager" element={<CertManager />} />
                 <Route path="/merge" element={<Merge />} />
                 <Route path="*" element={<NotFound />} />

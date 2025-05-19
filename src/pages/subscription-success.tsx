@@ -11,16 +11,16 @@ import { Button } from "@/components/ui/button";
 export default function SubscriptionSuccess() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, refreshUser } = useAuth();
+  const { refreshUser } = useAuth();
   
   // Check subscription status and update user
   useEffect(() => {
     const checkSubscription = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('check-subscription');
+        const { error } = await supabase.functions.invoke('check-subscription');
         
         if (error) {
-          console.error("Error checking subscription:", error);
+          console.error("Erro ao verificar assinatura:", error);
           toast({
             variant: "destructive",
             title: "Erro ao verificar assinatura",
@@ -31,11 +31,16 @@ export default function SubscriptionSuccess() {
         
         // Refresh user data to get updated plan
         if (refreshUser) {
-          refreshUser();
+          await refreshUser();
+          
+          toast({
+            title: "Assinatura confirmada!",
+            description: "Seu plano Premium foi ativado com sucesso.",
+          });
         }
         
       } catch (error) {
-        console.error("Error in subscription check:", error);
+        console.error("Erro na verificação da assinatura:", error);
       }
     };
     
