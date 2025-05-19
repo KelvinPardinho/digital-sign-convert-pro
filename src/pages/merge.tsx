@@ -77,12 +77,12 @@ export default function PDFMerge() {
       // Access the default export for pdfMake
       const pdfMake = pdfMakeModule.default || pdfMakeModule;
       
-      // Set vfs fonts correctly - access vfs directly, not through pdfMake property
-      if (pdfFontsModule.default && pdfFontsModule.default.pdfMake && pdfFontsModule.default.pdfMake.vfs) {
-        pdfMake.vfs = pdfFontsModule.default.pdfMake.vfs;
-      } else if (pdfFontsModule.pdfMake && pdfFontsModule.pdfMake.vfs) {
-        // Alternative access path if needed
-        pdfMake.vfs = pdfFontsModule.pdfMake.vfs;
+      // Set virtual file system (vfs) for fonts
+      // Handle different module formats
+      if (pdfFontsModule.default) {
+        pdfMake.vfs = pdfFontsModule.default.vfs || {};
+      } else {
+        pdfMake.vfs = pdfFontsModule.vfs || {};
       }
 
       // Read PDF files as data URLs
