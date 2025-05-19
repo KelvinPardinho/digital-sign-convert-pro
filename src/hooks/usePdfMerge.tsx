@@ -1,12 +1,14 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { FileWithPreview } from "@/types/file";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/providers/AuthProvider";
+import { useNavigate } from "react-router-dom";
 
 export function usePdfMerge() {
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   
@@ -50,7 +52,18 @@ export function usePdfMerge() {
   };
 
   // Handle file drop
-  const handleFileDrop = (acceptedFiles: File[]) => {
+  const handleFileDrop = useCallback((acceptedFiles: File[]) => {
+    // Verify files are PDFs
+    const nonPdfFiles = acceptedFiles.filter(file => file.type !== "application/pdf");
+    if (nonPdfFiles.length > 0) {
+      toast({
+        variant: "destructive",
+        title: "Formato inválido",
+        description: "Por favor, selecione apenas arquivos PDF."
+      });
+      return;
+    }
+
     // Check if user is premium for this feature
     if (!isPremium) {
       toast({
@@ -58,6 +71,12 @@ export function usePdfMerge() {
         title: "Recurso Premium",
         description: "A junção de PDFs está disponível apenas para usuários Premium."
       });
+      
+      // Redirect to subscription page after a short delay
+      setTimeout(() => {
+        navigate("/subscription");
+      }, 2000);
+      
       return;
     }
     
@@ -67,11 +86,11 @@ export function usePdfMerge() {
       });
     }) as FileWithPreview[];
     
-    setFiles([...files, ...newFiles]);
-  };
+    setFiles(prev => [...prev, ...newFiles]);
+  }, [isPremium, toast, navigate]);
 
   // Handle merge of PDFs
-  const handleMerge = () => {
+  const handleMerge = async () => {
     if (files.length < 2) {
       toast({
         variant: "destructive",
@@ -81,21 +100,23 @@ export function usePdfMerge() {
       return;
     }
     
-    // Verify premium status again
+    // Verify premium status again for security
     if (!isPremium) {
       toast({
         variant: "destructive",
         title: "Recurso Premium",
         description: "A junção de PDFs está disponível apenas para usuários Premium."
       });
+      navigate("/subscription");
       return;
     }
     
     setIsProcessing(true);
     
-    // Simulate processing delay
-    setTimeout(() => {
-      setIsProcessing(false);
+    try {
+      // In a production environment, this would use a PDF library like pdf-lib
+      // For now, simulate processing delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       toast({
         title: "PDFs unidos com sucesso",
@@ -103,12 +124,24 @@ export function usePdfMerge() {
       });
       
       // In a real app, we would generate and provide the download link
-      // For now, just simulate download
       const link = document.createElement('a');
       link.href = '#';
       link.download = 'documentos-unidos.pdf';
       link.click();
-    }, 2000);
+      
+      // Clear files after successful merge
+      files.forEach(file => URL.revokeObjectURL(file.preview));
+      setFiles([]);
+    } catch (error) {
+      console.error("Error merging PDFs:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao unir PDFs",
+        description: "Ocorreu um erro ao processar os arquivos."
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   // Clean up previews when component unmounts

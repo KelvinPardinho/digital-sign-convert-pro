@@ -1,6 +1,5 @@
-
 import * as React from "react"
-import type { SidebarContext as SidebarContextType } from "./types"
+import type { SidebarContext as SidebarContextType, SidebarProviderProps } from "./types"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { TooltipProvider } from "@/components/ui/tooltip"
 
@@ -25,7 +24,7 @@ export function useSidebar() {
 
 export const SidebarProvider = React.forwardRef<
   HTMLDivElement,
-  SidebarContextType["SidebarProviderProps"]
+  SidebarProviderProps
 >(
   (
     {
@@ -130,4 +129,3 @@ SidebarProvider.displayName = "SidebarProvider"
 function cn(...classes: any[]) {
   return classes.filter(Boolean).join(" ")
 }
-

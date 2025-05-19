@@ -2,7 +2,6 @@
 import React from "react";
 import { useDropzone } from "react-dropzone";
 import { Files, Shield } from "lucide-react";
-import { FileWithPreview } from "@/types/file";
 
 interface DropZoneProps {
   onDrop: (acceptedFiles: File[]) => void;
@@ -10,7 +9,7 @@ interface DropZoneProps {
 }
 
 export function DropZone({ onDrop, isPremium }: DropZoneProps) {
-  const { getRootProps, getInputProps } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
       'application/pdf': ['.pdf'],
     },
@@ -18,7 +17,12 @@ export function DropZone({ onDrop, isPremium }: DropZoneProps) {
   });
 
   return (
-    <div {...getRootProps({ className: 'dropzone' })} className="border-2 border-dashed rounded-md p-6 cursor-pointer hover:bg-muted/50 transition-colors">
+    <div 
+      {...getRootProps({ className: 'dropzone' })} 
+      className={`border-2 border-dashed rounded-md p-6 cursor-pointer transition-colors ${
+        isDragActive ? 'border-primary bg-primary/5' : 'border-muted hover:bg-muted/50'
+      }`}
+    >
       <input {...getInputProps()} />
       <div className="flex flex-col items-center justify-center text-center">
         <Files className="h-12 w-12 text-muted-foreground mb-4" />

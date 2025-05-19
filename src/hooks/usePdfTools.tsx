@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/providers/AuthProvider";
 import { FileWithPreview } from "@/types/file";
@@ -28,32 +28,45 @@ export function usePdfTools(acceptedTypes = { 'application/pdf': ['.pdf'] }) {
       return;
     }
 
-    // Add preview to the file
-    const fileWithPreview = Object.assign(selectedFile, {
-      preview: URL.createObjectURL(selectedFile)
-    }) as FileWithPreview;
-    
-    // Clear previous file if exists
-    if (file?.preview) {
-      URL.revokeObjectURL(file.preview);
+    try {
+      // Add preview to the file
+      const fileWithPreview = Object.assign(selectedFile, {
+        preview: URL.createObjectURL(selectedFile)
+      }) as FileWithPreview;
+      
+      // Clear previous file if exists
+      if (file?.preview) {
+        URL.revokeObjectURL(file.preview);
+      }
+      
+      setFile(fileWithPreview);
+    } catch (error) {
+      console.error("Error processing file:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro ao processar arquivo",
+        description: "Não foi possível processar o arquivo selecionado.",
+      });
     }
-    
-    setFile(fileWithPreview);
   }, [file, maxFileSize, toast, user]);
 
-  const resetFile = () => {
+  const resetFile = useCallback(() => {
     if (file?.preview) {
       URL.revokeObjectURL(file.preview);
     }
     setFile(null);
-  };
+  }, [file]);
 
   // Clean up the preview URL when component unmounts
-  const cleanup = () => {
+  const cleanup = useCallback(() => {
     if (file?.preview) {
       URL.revokeObjectURL(file.preview);
     }
-  };
+  }, [file]);
+
+  useEffect(() => {
+    return cleanup;
+  }, [cleanup]);
 
   return {
     file,
@@ -63,6 +76,7 @@ export function usePdfTools(acceptedTypes = { 'application/pdf': ['.pdf'] }) {
     isProcessing,
     setIsProcessing,
     cleanup,
-    acceptedTypes
+    acceptedTypes,
+    maxFileSize
   };
 }

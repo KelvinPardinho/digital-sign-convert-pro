@@ -2,7 +2,7 @@
 import { VariantProps } from "class-variance-authority"
 import { sidebarMenuButtonVariants } from "./sidebar-menu-button"
 
-export type SidebarContext = {
+export interface SidebarContext {
   state: "expanded" | "collapsed"
   open: boolean
   setOpen: (open: boolean) => void
@@ -10,11 +10,6 @@ export type SidebarContext = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
-  SidebarProviderProps?: React.ComponentProps<"div"> & {
-    defaultOpen?: boolean
-    open?: boolean
-    onOpenChange?: (open: boolean) => void
-  }
 }
 
 export type SidebarVariant = "sidebar" | "floating" | "inset"

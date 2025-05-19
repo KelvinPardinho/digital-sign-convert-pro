@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
@@ -36,7 +37,10 @@ export function FilesActionButton({ onMerge, isProcessing, disabled }: FilesActi
         onClick={handleClick}
       >
         {isProcessing ? (
-          "Processando..."
+          <>
+            <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full mr-2"></div>
+            Processando...
+          </>
         ) : (
           <>
             <Download className="h-4 w-4 mr-2" />
