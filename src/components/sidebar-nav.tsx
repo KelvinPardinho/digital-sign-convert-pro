@@ -78,7 +78,7 @@ export function SidebarNav() {
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3 mb-4">
           <Avatar>
-            <AvatarImage src={user?.user_metadata?.avatar_url} />
+            <AvatarImage src={user?.user_metadata?.avatar} />
             <AvatarFallback>{userInitials}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
