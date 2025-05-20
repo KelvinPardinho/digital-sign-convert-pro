@@ -116,16 +116,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         throw error;
       }
 
-      if (data.user?.id) {
-        const { error: userError } = await supabase
-          .from('users')
-          .insert([{ id: data.user.id, email, plan: 'free', is_admin: false }]);
-
-        if (userError) {
-          throw userError;
-        }
-      }
-
       toast({
         title: "Conta criada com sucesso!",
         description: "Verifique seu email para confirmar sua conta.",
