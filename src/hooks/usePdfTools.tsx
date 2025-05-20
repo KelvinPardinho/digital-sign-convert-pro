@@ -1,71 +1,39 @@
 
-import { useState, useCallback, useEffect } from "react";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/providers/AuthProvider";
-import { FileWithPreview } from "@/types/file";
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
-import { v4 as uuidv4 } from 'uuid';
+import { useToast } from './use-toast';
+import { useAuth } from '@/providers/AuthProvider';
 
-export function usePdfTools(acceptedTypes = { 'application/pdf': ['.pdf'] }) {
-  const [file, setFile] = useState<FileWithPreview | null>(null);
+type ProcessOptions = {
+  password?: string;
+  pageRanges?: string;
+};
+
+export const usePdfTools = () => {
+  const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const maxFileSize = user?.plan === 'premium' ? 50 * 1024 * 1024 : 10 * 1024 * 1024; // 50MB or 10MB
-
+  // Função para lidar com o arquivo solto
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length === 0) return;
-    
-    const selectedFile = acceptedFiles[0];
-    
-    // Check file size
-    if (selectedFile.size > maxFileSize) {
-      const planText = user?.plan === 'premium' ? 'Premium (50MB)' : 'Gratuito (10MB)';
-      toast({
-        variant: "destructive",
-        title: "Arquivo muito grande",
-        description: `O arquivo excede o limite de tamanho do plano ${planText}.`,
-      });
-      return;
+    if (acceptedFiles.length > 0) {
+      setFile(acceptedFiles[0]);
     }
+  }, []);
 
-    try {
-      // Add preview to the file
-      const fileWithPreview = Object.assign(selectedFile, {
-        preview: URL.createObjectURL(selectedFile)
-      }) as FileWithPreview;
-      
-      // Clear previous file if exists
-      if (file?.preview) {
-        URL.revokeObjectURL(file.preview);
-      }
-      
-      setFile(fileWithPreview);
-    } catch (error) {
-      console.error("Error processing file:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao processar arquivo",
-        description: "Não foi possível processar o arquivo selecionado.",
-      });
-    }
-  }, [file, maxFileSize, toast, user]);
-
+  // Função para limpar o arquivo
   const resetFile = useCallback(() => {
-    if (file?.preview) {
-      URL.revokeObjectURL(file.preview);
-    }
     setFile(null);
-  }, [file]);
+  }, []);
 
-  // Process PDF with the specified operation
-  const processPdf = async (operation: string, additionalData = {}) => {
-    if (!file) {
+  // Função para processar o PDF com diferentes operações
+  const processPdf = async (operation: string, options: ProcessOptions = {}) => {
+    if (!file || !user) {
       toast({
         variant: "destructive",
-        title: "Nenhum arquivo selecionado",
-        description: "Por favor, adicione um arquivo PDF para processar.",
+        title: "Erro",
+        description: "Nenhum arquivo selecionado ou usuário não autenticado",
       });
       return false;
     }
@@ -73,94 +41,91 @@ export function usePdfTools(acceptedTypes = { 'application/pdf': ['.pdf'] }) {
     setIsProcessing(true);
 
     try {
-      // In a production environment, we would send the file to a backend service
-      // For now, simulate the process with a delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // Record the operation in the database if the user is logged in
-      if (user) {
-        // Get the file extension (format)
-        const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'pdf';
-        
-        // Create a unique filename for the output
-        const outputFilename = `${file.name.replace('.pdf', '')}_${operation}_${Date.now()}.pdf`;
-        
-        const { error } = await supabase
-          .from('conversions')
-          .insert({
-            original_filename: file.name,
-            original_format: fileExtension,
-            output_format: operation === 'ocr' ? 'pdf_ocr' : 
-                           operation === 'protect' ? 'pdf_protected' : 
-                           operation === 'unlock' ? 'pdf' : 'pdf',
-            output_url: `/conversions/${outputFilename}`,
-            user_id: user.id
-          });
-
-        if (error) {
-          console.error(`Error recording ${operation} operation:`, error);
-          throw new Error("Erro ao registrar operação no banco de dados");
-        }
+      // Obter uma sessão válida para enviar o token JWT
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        throw new Error("Sessão inválida");
       }
 
-      // For demonstration purposes, create a virtual download
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(new Blob([])); // Empty blob for demonstration
-      link.download = `${file.name.replace('.pdf', '')}_${operation}_${uuidv4()}.pdf`;
-      link.click();
+      // Prepare the file data (in a real scenario, we would upload it to storage)
+      // For this simulation, we're just sending the file name
+      const fileData = {
+        name: file.name,
+        size: file.size,
+        type: file.type
+      };
 
-      toast({
-        title: "Operação concluída com sucesso",
-        description: `O PDF foi processado com a operação ${getOperationName(operation)}.`,
+      // Chamar a função Edge do Supabase
+      const { data, error } = await supabase.functions.invoke('process-pdf', {
+        body: {
+          operation,
+          files: [fileData],
+          ...options
+        }
       });
 
-      resetFile();
-      return true;
-    } catch (error) {
-      console.error(`Erro ao processar PDF (${operation}):`, error);
+      if (error) {
+        throw error;
+      }
+
+      // Simular download do arquivo resultante
+      if (data.success) {
+        toast({
+          title: "Sucesso!",
+          description: data.message,
+        });
+
+        // Simular download - em um cenário real, obteríamos uma URL de download
+        setTimeout(() => {
+          const link = document.createElement('a');
+          if (operation === 'split' && data.outputUrls) {
+            // Para split, simular múltiplos downloads
+            data.outputUrls.forEach((url: string, i: number) => {
+              setTimeout(() => {
+                const parte = i + 1;
+                toast({
+                  title: `Baixando parte ${parte}`,
+                  description: `Iniciando download da parte ${parte}...`,
+                });
+              }, i * 1000);
+            });
+          } else if (data.outputUrl) {
+            // Para operações normais, simular um download
+            toast({
+              title: "Download iniciado",
+              description: "Seu arquivo está sendo baixado...",
+            });
+          }
+        }, 500);
+
+        return true;
+      } else {
+        throw new Error("Falha ao processar PDF");
+      }
+    } catch (error: any) {
       toast({
         variant: "destructive",
-        title: `Erro ao processar PDF`,
-        description: "Ocorreu um erro durante o processamento. Por favor, tente novamente.",
+        title: "Erro ao processar",
+        description: error.message || "Ocorreu um erro inesperado",
       });
+      console.error("Erro ao processar PDF:", error);
       return false;
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Helper function to get operation display name
-  const getOperationName = (operation: string): string => {
-    switch (operation) {
-      case 'ocr': return 'OCR';
-      case 'unlock': return 'remoção de senha';
-      case 'protect': return 'proteção com senha';
-      case 'split': return 'divisão';
-      default: return operation;
-    }
-  };
-
-  // Clean up the preview URL when component unmounts
+  // Função de limpeza
   const cleanup = useCallback(() => {
-    if (file?.preview) {
-      URL.revokeObjectURL(file.preview);
-    }
-  }, [file]);
-
-  useEffect(() => {
-    return cleanup;
-  }, [cleanup]);
+    resetFile();
+  }, [resetFile]);
 
   return {
     file,
-    setFile,
-    resetFile,
     onDrop,
     isProcessing,
-    setIsProcessing,
     processPdf,
-    cleanup,
-    acceptedTypes,
-    maxFileSize
+    resetFile,
+    cleanup
   };
-}
+};
