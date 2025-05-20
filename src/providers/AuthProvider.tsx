@@ -95,6 +95,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         title: "Erro ao logar",
         description: error.message,
       });
+      throw error;
     } finally {
       setLoading(false);
     }
