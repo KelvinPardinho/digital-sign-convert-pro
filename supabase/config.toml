@@ -29,6 +29,9 @@ jwt_expiry = 3600
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
+# Configurações de segurança adicionadas
+otp_time_to_live = 300
+enable_leaked_password_protection = true
 
 [functions]
 port = 54328
