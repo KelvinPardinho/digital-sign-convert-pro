@@ -38,3 +38,4 @@ port = 54328
 
 [functions.process-pdf]
 verify_jwt = true
+
