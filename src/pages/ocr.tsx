@@ -9,74 +9,29 @@ import { PdfFilePreview } from "@/components/pdf-tools/PdfFilePreview";
 import { ProcessControls } from "@/components/pdf-tools/ProcessControls";
 import { FileText } from "lucide-react";
 import { useAuth } from "@/providers/AuthProvider";
-import { supabase } from "@/integrations/supabase/client";
-import { v4 as uuidv4 } from 'uuid';
 
 export default function Ocr() {
-  const { file, onDrop, isProcessing, setIsProcessing, resetFile, cleanup } = usePdfTools();
+  const { file, onDrop, isProcessing, processPdf, resetFile, cleanup } = usePdfTools();
   const { toast } = useToast();
   const { user } = useAuth();
 
   useEffect(() => {
     return () => cleanup();
-  }, []);
+  }, [cleanup]);
 
   const handleOcr = async () => {
-    if (!file) {
+    // Check authentication
+    if (!user) {
       toast({
         variant: "destructive",
-        title: "Nenhum arquivo selecionado",
-        description: "Por favor, adicione um arquivo PDF para aplicar OCR.",
+        title: "Autenticação necessária",
+        description: "Você precisa estar logado para usar esta função.",
       });
       return;
     }
 
-    setIsProcessing(true);
-
-    try {
-      // In a real implementation, we would process the PDF with OCR here
-      // For now, simulate the process with a timeout
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      // Record the operation in the database if the user is logged in
-      if (user) {
-        const { error } = await supabase
-          .from('conversions')
-          .insert({
-            original_filename: file.name,
-            original_format: 'pdf',
-            output_format: 'pdf_ocr',
-            output_url: `/conversions/${file.name.replace('.pdf', '')}_ocr_${Date.now()}.pdf`,
-            user_id: user.id
-          });
-
-        if (error) {
-          console.error("Error recording operation:", error);
-        }
-      }
-
-      toast({
-        title: "OCR aplicado com sucesso",
-        description: "O texto do PDF foi reconhecido e agora é pesquisável.",
-      });
-
-      // In a real app, we would provide the download link for the OCR PDF
-      const link = document.createElement('a');
-      link.href = '#';
-      link.download = `${file.name.replace('.pdf', '')}_ocr_${uuidv4()}.pdf`;
-      link.click();
-
-      resetFile();
-    } catch (error) {
-      console.error("Erro ao aplicar OCR:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao aplicar OCR",
-        description: "Ocorreu um erro durante o processo de OCR. Por favor, tente novamente.",
-      });
-    } finally {
-      setIsProcessing(false);
-    }
+    // Process the PDF with OCR operation
+    await processPdf('ocr');
   };
 
   return (

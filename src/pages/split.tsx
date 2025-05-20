@@ -11,30 +11,27 @@ import { Split as SplitIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/providers/AuthProvider";
-import { supabase } from "@/integrations/supabase/client";
-import { v4 as uuidv4 } from 'uuid';
 
 export default function Split() {
-  const { file, onDrop, isProcessing, setIsProcessing, resetFile, cleanup } = usePdfTools();
+  const { file, onDrop, isProcessing, processPdf, resetFile, cleanup } = usePdfTools();
   const [pageRanges, setPageRanges] = useState("1-3,4-5");
   const { toast } = useToast();
   const { user } = useAuth();
 
   useEffect(() => {
     return () => cleanup();
-  }, []);
+  }, [cleanup]);
 
   const handleSplit = async () => {
-    if (!file) {
+    // Check authentication
+    if (!user) {
       toast({
         variant: "destructive",
-        title: "Nenhum arquivo selecionado",
-        description: "Por favor, adicione um arquivo PDF para dividir.",
+        title: "Autenticação necessária",
+        description: "Você precisa estar logado para usar esta função.",
       });
       return;
     }
-
-    setIsProcessing(true);
 
     // Validate page ranges format
     const rangePattern = /^\d+(-\d+)?(,\d+(-\d+)?)*$/;
@@ -44,54 +41,11 @@ export default function Split() {
         title: "Formato inválido",
         description: "O formato dos intervalos de página é inválido. Use o formato: 1-3,4,5-7",
       });
-      setIsProcessing(false);
       return;
     }
 
-    try {
-      // In a real implementation, we would process the PDF here
-      // For now, simulate the process with a timeout
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Record the operation in the database if the user is logged in
-      if (user) {
-        const { error } = await supabase
-          .from('conversions')
-          .insert({
-            original_filename: file.name,
-            original_format: 'pdf',
-            output_format: 'pdf',
-            output_url: `/conversions/${file.name.replace('.pdf', '')}_split_${Date.now()}.pdf`,
-            user_id: user.id
-          });
-
-        if (error) {
-          console.error("Error recording operation:", error);
-        }
-      }
-
-      toast({
-        title: "PDF dividido com sucesso",
-        description: "O PDF foi dividido de acordo com os intervalos especificados.",
-      });
-
-      // In a real app, we would provide download links for the split PDFs
-      const link = document.createElement('a');
-      link.href = '#';
-      link.download = `${file.name.replace('.pdf', '')}_split_${uuidv4()}.pdf`;
-      link.click();
-
-      resetFile();
-    } catch (error) {
-      console.error("Erro ao dividir PDF:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao dividir PDF",
-        description: "Ocorreu um erro durante o processo de divisão. Por favor, tente novamente.",
-      });
-    } finally {
-      setIsProcessing(false);
-    }
+    // Process the PDF with split operation, including the page ranges
+    await processPdf('split', { pageRanges });
   };
 
   return (

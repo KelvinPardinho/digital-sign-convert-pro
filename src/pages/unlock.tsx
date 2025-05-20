@@ -11,25 +11,24 @@ import { LockOpen } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/providers/AuthProvider";
-import { supabase } from "@/integrations/supabase/client";
-import { v4 as uuidv4 } from 'uuid';
 
 export default function Unlock() {
-  const { file, onDrop, isProcessing, setIsProcessing, resetFile, cleanup } = usePdfTools();
+  const { file, onDrop, isProcessing, processPdf, resetFile, cleanup } = usePdfTools();
   const [password, setPassword] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
 
   useEffect(() => {
     return () => cleanup();
-  }, []);
+  }, [cleanup]);
 
   const handleUnlock = async () => {
-    if (!file) {
+    // Check authentication
+    if (!user) {
       toast({
         variant: "destructive",
-        title: "Nenhum arquivo selecionado",
-        description: "Por favor, adicione um arquivo PDF para remover a senha.",
+        title: "Autenticação necessária",
+        description: "Você precisa estar logado para usar esta função.",
       });
       return;
     }
@@ -43,52 +42,12 @@ export default function Unlock() {
       return;
     }
 
-    setIsProcessing(true);
-
-    try {
-      // In a real implementation, we would decrypt the PDF here
-      // For now, simulate the process with a timeout
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      // Record the operation in the database if the user is logged in
-      if (user) {
-        const { error } = await supabase
-          .from('conversions')
-          .insert({
-            original_filename: file.name,
-            original_format: 'pdf_protected',
-            output_format: 'pdf',
-            output_url: `/conversions/${file.name.replace('.pdf', '')}_unlocked_${Date.now()}.pdf`,
-            user_id: user.id
-          });
-
-        if (error) {
-          console.error("Error recording operation:", error);
-        }
-      }
-
-      toast({
-        title: "Senha removida com sucesso",
-        description: "A senha foi removida do PDF.",
-      });
-
-      // In a real app, we would provide the download link for the unlocked PDF
-      const link = document.createElement('a');
-      link.href = '#';
-      link.download = `${file.name.replace('.pdf', '')}_unlocked_${uuidv4()}.pdf`;
-      link.click();
-
-      resetFile();
+    // Process the PDF with unlock operation, including the password
+    const success = await processPdf('unlock', { password });
+    
+    // Clear password field if successful
+    if (success) {
       setPassword("");
-    } catch (error) {
-      console.error("Erro ao remover senha do PDF:", error);
-      toast({
-        variant: "destructive",
-        title: "Erro ao remover senha",
-        description: "Ocorreu um erro durante o processo. Verifique se a senha está correta.",
-      });
-    } finally {
-      setIsProcessing(false);
     }
   };
 

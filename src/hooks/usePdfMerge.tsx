@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { FileWithPreview } from "@/types/file";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/providers/AuthProvider";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { v4 as uuidv4 } from 'uuid';
 
 export function usePdfMerge() {
   const { toast } = useToast();
@@ -35,7 +37,9 @@ export function usePdfMerge() {
   const removeFile = (index: number) => {
     const newFiles = [...files];
     // Revoke the URL to avoid memory leaks
-    URL.revokeObjectURL(newFiles[index].preview);
+    if (newFiles[index]?.preview) {
+      URL.revokeObjectURL(newFiles[index].preview);
+    }
     newFiles.splice(index, 1);
     setFiles(newFiles);
   };
@@ -64,19 +68,15 @@ export function usePdfMerge() {
       return;
     }
 
-    // Check if user is premium for this feature
-    if (!isPremium) {
+    // Check file size limits based on user plan
+    const maxSize = user?.plan === 'premium' ? 50 * 1024 * 1024 : 10 * 1024 * 1024; // 50MB or 10MB
+    const oversizedFiles = acceptedFiles.filter(file => file.size > maxSize);
+    if (oversizedFiles.length > 0) {
       toast({
-        variant: "destructive", 
-        title: "Recurso Premium",
-        description: "A junção de PDFs está disponível apenas para usuários Premium."
+        variant: "destructive",
+        title: "Arquivo muito grande",
+        description: `O tamanho máximo de arquivo para seu plano é ${maxSize / (1024 * 1024)}MB.`
       });
-      
-      // Redirect to subscription page after a short delay
-      setTimeout(() => {
-        navigate("/subscription");
-      }, 2000);
-      
       return;
     }
     
@@ -87,7 +87,7 @@ export function usePdfMerge() {
     }) as FileWithPreview[];
     
     setFiles(prev => [...prev, ...newFiles]);
-  }, [isPremium, toast, navigate]);
+  }, [user, toast]);
 
   // Handle merge of PDFs
   const handleMerge = async () => {
@@ -114,9 +114,33 @@ export function usePdfMerge() {
     setIsProcessing(true);
     
     try {
-      // In a production environment, this would use a PDF library like pdf-lib
-      // For now, simulate processing delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // In a production environment, we'd use the PDFLib library
+      // But for now, we'll simulate the process and record it in the database
+      
+      // Create a merged output filename
+      const outputFilename = `documentos-unidos-${Date.now()}.pdf`;
+      
+      if (user) {
+        // Record the operation in Supabase
+        const { error } = await supabase
+          .from('conversions')
+          .insert({
+            original_filename: files.map(f => f.name).join(","),
+            original_format: "pdf",
+            output_format: "pdf",
+            output_url: `/conversions/${outputFilename}`,
+            user_id: user.id
+          });
+          
+        if (error) {
+          console.error("Error recording PDF merge:", error);
+          throw new Error("Erro ao registrar operação no banco de dados");
+        }
+      }
+      
+      // In a real implementation, we would merge the PDFs here
+      // For now, we'll simulate a successful merge
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       toast({
         title: "PDFs unidos com sucesso",
@@ -125,19 +149,21 @@ export function usePdfMerge() {
       
       // In a real app, we would generate and provide the download link
       const link = document.createElement('a');
-      link.href = '#';
-      link.download = 'documentos-unidos.pdf';
+      link.href = URL.createObjectURL(new Blob([])); // Empty blob for demonstration
+      link.download = outputFilename;
       link.click();
       
-      // Clear files after successful merge
-      files.forEach(file => URL.revokeObjectURL(file.preview));
+      // Clean up files after successful merge
+      files.forEach(file => {
+        if (file.preview) URL.revokeObjectURL(file.preview);
+      });
       setFiles([]);
     } catch (error) {
       console.error("Error merging PDFs:", error);
       toast({
         variant: "destructive",
         title: "Erro ao unir PDFs",
-        description: "Ocorreu um erro ao processar os arquivos."
+        description: "Ocorreu um erro ao processar os arquivos. Por favor, tente novamente."
       });
     } finally {
       setIsProcessing(false);
@@ -147,7 +173,9 @@ export function usePdfMerge() {
   // Clean up previews when component unmounts
   useEffect(() => {
     return () => {
-      files.forEach(file => URL.revokeObjectURL(file.preview));
+      files.forEach(file => {
+        if (file.preview) URL.revokeObjectURL(file.preview);
+      });
     };
   }, []);
 
