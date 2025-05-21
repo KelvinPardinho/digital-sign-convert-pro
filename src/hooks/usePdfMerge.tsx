@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/providers/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { v4 as uuidv4 } from 'uuid';
 
 export function usePdfMerge() {
   const { toast } = useToast();
@@ -111,59 +112,101 @@ export function usePdfMerge() {
     }
     
     if (!session) {
-      toast({
-        variant: "destructive",
-        title: "Sessão inválida",
-        description: "Por favor, faça login novamente."
-      });
-      return;
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session) {
+        toast({
+          variant: "destructive",
+          title: "Sessão expirada",
+          description: "Por favor, faça login novamente.",
+        });
+        return;
+      }
     }
     
     setIsProcessing(true);
     
     try {
-      // In a production environment, we'd use the PDFLib library
-      // But for now, we'll simulate the process and record it in the database
+      const fileId = uuidv4();
+      const uploadPromises = [];
+      const fileUrls = [];
       
-      // Create a merged output filename
-      const outputFilename = `documentos-unidos-${Date.now()}.pdf`;
+      // First check if the storage bucket exists
+      const { data: bucketData, error: bucketError } = await supabase
+        .storage
+        .getBucket('pdf-operations');
+        
+      if (bucketError && bucketError.message.includes('does not exist')) {
+        // Create the bucket if it doesn't exist
+        await supabase.storage.createBucket('pdf-operations', { public: true });
+      }
       
-      if (user) {
-        // Call the Edge function to merge PDFs
-        const { data, error } = await supabase.functions.invoke('process-pdf', {
-          body: {
-            operation: 'merge',
-            files: files.map(f => ({
-              name: f.name,
-              size: f.size,
-              type: f.type
-            }))
-          }
+      // Upload all files first
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileName = `merge-input-${i+1}-${fileId}-${file.name}`;
+        
+        // Upload the file
+        const uploadPromise = supabase
+          .storage
+          .from('pdf-operations')
+          .upload(`original/${user?.id}/${fileName}`, file);
+          
+        uploadPromises.push(uploadPromise);
+      }
+      
+      // Wait for all uploads to complete
+      const uploadResults = await Promise.all(uploadPromises);
+      
+      // Check for upload errors
+      const uploadErrors = uploadResults.filter(result => result.error);
+      if (uploadErrors.length > 0) {
+        throw new Error(`Failed to upload ${uploadErrors.length} files`);
+      }
+      
+      // Get public URLs for all uploaded files
+      for (let i = 0; i < files.length; i++) {
+        const fileName = `merge-input-${i+1}-${fileId}-${files[i].name}`;
+        const { data: publicUrlData } = supabase
+          .storage
+          .from('pdf-operations')
+          .getPublicUrl(`original/${user?.id}/${fileName}`);
+          
+        fileUrls.push(publicUrlData.publicUrl);
+      }
+      
+      // Call the edge function to merge PDFs
+      const { data, error } = await supabase.functions.invoke('process-pdf', {
+        body: {
+          operation: 'merge',
+          fileUrls: fileUrls,
+          fileId,
+          fileName: 'merged-document.pdf',
+          userId: user?.id
+        }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (!data.success) {
+        throw new Error(data.error || "Erro ao mesclar PDFs");
+      }
+      
+      // Record the operation in Supabase
+      const { error: recordError } = await supabase
+        .from('pdf_operations')
+        .insert({
+          user_id: user?.id,
+          operation: 'merge',
+          file_name: 'merged-document.pdf',
+          file_count: files.length,
+          status: 'completed',
+          output_url: data.outputUrl
         });
         
-        if (error) {
-          throw error;
-        }
-        
-        if (!data.success) {
-          throw new Error(data.error || "Erro ao mesclar PDFs");
-        }
-        
-        // Record the operation in Supabase
-        const { error: recordError } = await supabase
-          .from('conversions')
-          .insert({
-            original_filename: files.map(f => f.name).join(","),
-            original_format: "pdf",
-            output_format: "pdf",
-            output_url: data.outputUrl || `/conversions/${outputFilename}`,
-            user_id: user.id
-          });
-          
-        if (recordError) {
-          console.error("Error recording PDF merge:", recordError);
-          // Don't throw here to avoid blocking the success flow
-        }
+      if (recordError) {
+        console.error("Error recording PDF merge:", recordError);
       }
       
       toast({
@@ -171,17 +214,28 @@ export function usePdfMerge() {
         description: `${files.length} arquivos foram combinados em um único PDF.`
       });
       
-      // In a real app, we would generate and provide the download link
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(new Blob([])); // Empty blob for demonstration
-      link.download = outputFilename;
-      link.click();
+      // Download the merged file
+      setTimeout(() => {
+        // Create a link to download the file
+        const link = document.createElement('a');
+        link.href = data.outputUrl;
+        link.download = `documentos-unidos-${Date.now()}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        toast({
+          title: "Download iniciado",
+          description: "Seu arquivo combinado está sendo baixado..."
+        });
+      }, 500);
       
       // Clean up files after successful merge
       files.forEach(file => {
         if (file.preview) URL.revokeObjectURL(file.preview);
       });
       setFiles([]);
+      
     } catch (error) {
       console.error("Error merging PDFs:", error);
       toast({

@@ -10,7 +10,7 @@ export function useFileConversion() {
   const [converting, setConverting] = useState(false);
   const [outputFormat, setOutputFormat] = useState<string>("pdf");
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
 
   const handleConvert = async (files: FileWithPreview[]) => {
     if (files.length === 0) {
@@ -38,78 +38,128 @@ export function useFileConversion() {
     setConverting(true);
     
     try {
-      // Array to store promises for parallel processing
-      const conversionPromises = files.map(async (file) => {
-        // Get the file extension (format)
-        const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
-        
-        // Create a unique filename for the output file
-        const outputFilename = `${file.name.split('.')[0]}_${Date.now()}.${outputFormat}`;
-        
-        // In a real implementation, we would send the file to a conversion service
-        // For now, simulate the conversion process
-        
-        // Simulate file upload to storage
-        if (user) {
-          try {
-            // First upload the file to Supabase Storage (in a real app)
-            // For now, we'll just simulate this part
+      // For each file, we'll upload it to storage and then process it
+      const convertedFiles = await Promise.all(files.map(async (file) => {
+        try {
+          // Get the file extension (format)
+          const fileExtension = file.name.split('.').pop()?.toLowerCase() || '';
+          
+          // Create a unique filename for the output file
+          const outputFilename = `${file.name.split('.')[0]}_${Date.now()}.${outputFormat}`;
+          const fileId = uuidv4();
+          
+          if (!session) {
+            toast({
+              variant: "destructive",
+              title: "Sessão expirada",
+              description: "Por favor, faça login novamente para continuar.",
+            });
+            return { success: false, message: "Sessão expirada" };
+          }
+
+          // First, upload the file to Supabase Storage
+          if (user) {
+            // Create a bucket if it doesn't exist
+            const { data: bucketData, error: bucketError } = await supabase
+              .storage
+              .getBucket('conversions');
+              
+            if (bucketError && bucketError.message.includes('does not exist')) {
+              // Create the bucket if it doesn't exist
+              await supabase.storage.createBucket('conversions', { public: true });
+            }
+
+            // Upload the file to storage
+            const { data: uploadData, error: uploadError } = await supabase
+              .storage
+              .from('conversions')
+              .upload(`original/${user.id}/${fileId}-${file.name}`, file);
+
+            if (uploadError) {
+              console.error("Error uploading file:", uploadError);
+              return { success: false, message: "Erro ao enviar arquivo" };
+            }
+
+            // Get a public URL for the uploaded file
+            const { data: publicUrlData } = supabase
+              .storage
+              .from('conversions')
+              .getPublicUrl(`original/${user.id}/${fileId}-${file.name}`);
             
-            // Then record the conversion in the database
-            const { data, error } = await supabase
+            // Call the edge function to process the conversion
+            const { data, error } = await supabase.functions.invoke('convert-file', {
+              body: {
+                fileUrl: publicUrlData.publicUrl,
+                fileId,
+                originalFilename: file.name,
+                originalFormat: fileExtension,
+                outputFormat,
+                userId: user.id
+              }
+            });
+
+            if (error) {
+              console.error("Error in conversion process:", error);
+              return { success: false, message: "Falha na conversão" };
+            }
+
+            // Record the conversion in the database
+            const { error: recordError } = await supabase
               .from('conversions')
               .insert({
-                original_filename: file.name.split('.')[0],
+                original_filename: file.name,
                 original_format: fileExtension,
                 output_format: outputFormat,
-                output_url: `/conversions/${outputFilename}`,
+                output_url: data.outputUrl || `/conversions/${outputFilename}`,
                 user_id: user.id
-              })
-              .select()
-              .single();
+              });
               
-            if (error) {
-              console.error("Error recording conversion:", error);
+            if (recordError) {
+              console.error("Error recording conversion:", recordError);
             }
-            
+
             return {
               success: true,
               filename: file.name,
-              outputUrl: `/conversions/${outputFilename}`
+              outputUrl: data.outputUrl || `/conversions/${outputFilename}`
             };
-          } catch (error) {
-            console.error("Error during conversion process:", error);
-            return {
-              success: false,
-              filename: file.name,
-              error: "Falha na conversão"
-            };
-          }
-        } else {
-          // For users not logged in, just simulate the conversion
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          } 
           
-          return {
-            success: true,
-            filename: file.name,
-            outputUrl: `/conversions/${outputFilename}`
-          };
+          return { success: false, message: "Usuário não autenticado" };
+        } catch (error) {
+          console.error("Error processing file:", error);
+          return { success: false, filename: file.name, error: "Erro no processamento" };
         }
-      });
-      
-      // Wait for all conversions to complete
-      const results = await Promise.all(conversionPromises);
+      }));
       
       // Count successful conversions
-      const successCount = results.filter(r => r.success).length;
+      const successCount = convertedFiles.filter(r => r.success).length;
       
       // Show toast with result
       toast({
         title: successCount === files.length ? "Conversão concluída" : "Conversão parcialmente concluída",
         description: `${successCount} de ${files.length} arquivo(s) convertido(s) com sucesso!`,
       });
-      
-      // In a real application, we would redirect to the downloads or provide download links
+
+      // Trigger downloads for successful conversions
+      convertedFiles.filter(f => f.success).forEach(file => {
+        if ((file as any).outputUrl) {
+          setTimeout(() => {
+            // Create a link to download the file
+            const link = document.createElement('a');
+            link.href = (file as any).outputUrl;
+            link.download = `${(file as any).filename.split('.')[0]}.${outputFormat}`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            toast({
+              title: "Download iniciado",
+              description: `Baixando ${(file as any).filename.split('.')[0]}.${outputFormat}...`,
+            });
+          }, 1000);
+        }
+      });
       
     } catch (error) {
       console.error("Error in conversion process:", error);

@@ -7,12 +7,12 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Função auxiliar para criar cliente Supabase
+// Helper function to create Supabase client
 const createSupabaseClient = (req: Request) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
   
-  // Pegar o token JWT do cabeçalho de autorização
+  // Get JWT token from authorization header
   const authHeader = req.headers.get('Authorization');
   const jwt = authHeader?.replace('Bearer ', '') ?? '';
   
@@ -25,17 +25,107 @@ const createSupabaseClient = (req: Request) => {
   });
 };
 
+// Helper to simulate PDF processing
+const simulatePdfProcessing = async (operation: string, fileUrl: string, fileId: string, userId: string, options: any = {}) => {
+  // In a real implementation, we would use PDF libraries to process the file
+  // For this demo, we'll simulate the processing and return mock results
+  
+  // Simulated delay to mimic processing time
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  // Generate timestamp for unique filenames
+  const timestamp = new Date().getTime();
+  
+  // Handle different operations
+  switch (operation) {
+    case 'merge': {
+      const outputFilename = `merged-${timestamp}.pdf`;
+      const outputUrl = `https://tpvywtsldvdsovsdxamn.supabase.co/storage/v1/object/public/pdf-operations/processed/${userId}/${outputFilename}`;
+      return {
+        success: true,
+        message: "PDFs mesclados com sucesso",
+        outputUrl
+      };
+    }
+      
+    case 'ocr': {
+      const outputFilename = `ocr-${timestamp}.pdf`;
+      const outputUrl = `https://tpvywtsldvdsovsdxamn.supabase.co/storage/v1/object/public/pdf-operations/processed/${userId}/${outputFilename}`;
+      return {
+        success: true,
+        message: "OCR aplicado com sucesso",
+        outputUrl
+      };
+    }
+      
+    case 'split': {
+      // Parse page ranges
+      const pageRanges = options.pageRanges ? options.pageRanges.split(',') : ['1-3', '4-5'];
+      const outputUrls = pageRanges.map((range: string, index: number) => {
+        const outputFilename = `split-${index+1}-${timestamp}.pdf`;
+        return `https://tpvywtsldvdsovsdxamn.supabase.co/storage/v1/object/public/pdf-operations/processed/${userId}/${outputFilename}`;
+      });
+      
+      return {
+        success: true,
+        message: `PDF dividido em ${outputUrls.length} partes com sucesso`,
+        outputUrls
+      };
+    }
+      
+    case 'protect': {
+      if (!options.password) {
+        return {
+          success: false,
+          message: "Senha não fornecida"
+        };
+      }
+      
+      const outputFilename = `protected-${timestamp}.pdf`;
+      const outputUrl = `https://tpvywtsldvdsovsdxamn.supabase.co/storage/v1/object/public/pdf-operations/processed/${userId}/${outputFilename}`;
+      return {
+        success: true,
+        message: "PDF protegido com sucesso",
+        outputUrl
+      };
+    }
+      
+    case 'unlock': {
+      if (!options.password) {
+        return {
+          success: false,
+          message: "Senha não fornecida"
+        };
+      }
+      
+      const outputFilename = `unlocked-${timestamp}.pdf`;
+      const outputUrl = `https://tpvywtsldvdsovsdxamn.supabase.co/storage/v1/object/public/pdf-operations/processed/${userId}/${outputFilename}`;
+      return {
+        success: true,
+        message: "PDF desbloqueado com sucesso",
+        outputUrl
+      };
+    }
+      
+    default:
+      return {
+        success: false,
+        message: "Operação inválida"
+      };
+  }
+};
+
 serve(async (req) => {
-  // Lidar com solicitações CORS preflight
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Verificar autenticação pelo ambiente
+    // Verify authentication
     const supabase = createSupabaseClient(req);
     
-    // Verificar a sessão do usuário
+    // Verify user session
     const {
       data: { user },
       error: userError,
@@ -54,7 +144,7 @@ serve(async (req) => {
       );
     }
     
-    // Processar solicitação
+    // Parse request body
     let requestBody;
     try {
       requestBody = await req.json();
@@ -65,23 +155,16 @@ serve(async (req) => {
       );
     }
     
-    const { operation, files, password } = requestBody;
+    const { operation, fileUrl, fileId, fileName, fileSize, fileType, userId, ...options } = requestBody;
     
-    if (!operation) {
+    if (!operation || !fileUrl) {
       return new Response(
-        JSON.stringify({ error: "Operação não especificada" }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!files || !Array.isArray(files) || files.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "Arquivos não especificados" }),
+        JSON.stringify({ error: "Operação ou arquivo não especificado" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
-    // Verificar plano do usuário para operações premium
+    // Check user plan for premium operations
     const { data: userData, error: userDataError } = await supabase
       .from('users')
       .select('plan')
@@ -104,87 +187,30 @@ serve(async (req) => {
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Process the PDF operation (simulated)
+    const result = await simulatePdfProcessing(operation, fileUrl, fileId, userId, options);
     
-    // Registrar operação
-    const { error: operationError } = await supabase
-      .from('pdf_operations')
-      .insert({
-        user_id: user.id,
-        operation: operation,
-        file_count: Array.isArray(files) ? files.length : 1,
-        status: 'completed'
-      });
-      
-    if (operationError) {
-      console.error("Erro ao registrar operação:", operationError);
-      // Não interromper o fluxo por causa de erro de registro
-    }
-    
-    // Processar com base na operação
-    let result;
-    switch (operation) {
-      case 'merge':
-        // Em uma implementação real, integraríamos com bibliotecas de PDF aqui
-        result = {
-          success: true,
-          message: "PDFs mesclados com sucesso",
-          outputUrl: `/output/merged-${Date.now()}.pdf`
-        };
-        break;
+    // Record the operation
+    if (result.success) {
+      const { error: operationError } = await supabase
+        .from('pdf_operations')
+        .insert({
+          user_id: user.id,
+          operation: operation,
+          file_name: fileName || 'unknown',
+          file_size: fileSize || 0,
+          status: 'completed'
+        });
         
-      case 'ocr':
-        result = {
-          success: true,
-          message: "OCR aplicado com sucesso",
-          outputUrl: `/output/ocr-${Date.now()}.pdf`
-        };
-        break;
-        
-      case 'split':
-        result = {
-          success: true,
-          message: "PDF dividido com sucesso",
-          outputUrls: [
-            `/output/split-1-${Date.now()}.pdf`,
-            `/output/split-2-${Date.now()}.pdf`
-          ]
-        };
-        break;
-        
-      case 'protect':
-        result = {
-          success: true,
-          message: "PDF protegido com sucesso",
-          outputUrl: `/output/protected-${Date.now()}.pdf`
-        };
-        break;
-        
-      case 'unlock':
-        // Verificar se a senha foi fornecida
-        if (!password) {
-          return new Response(
-            JSON.stringify({ error: "Senha não fornecida" }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-        
-        result = {
-          success: true,
-          message: "PDF desbloqueado com sucesso",
-          outputUrl: `/output/unlocked-${Date.now()}.pdf`
-        };
-        break;
-        
-      default:
-        return new Response(
-          JSON.stringify({ error: "Operação inválida" }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      if (operationError) {
+        console.error("Error recording operation:", operationError);
+      }
     }
 
     return new Response(
       JSON.stringify(result),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: result.success ? 200 : 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
     
   } catch (error) {
