@@ -1,10 +1,13 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { User } from "@/types/auth";
+import { Session } from "@supabase/supabase-js";
 
 interface AuthState {
   user: User | null;
+  session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
@@ -20,33 +23,44 @@ interface AuthProviderProps {
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      setSession(newSession);
+      
+      if (event === "SIGNED_IN" && newSession?.user) {
+        // Using setTimeout to avoid deadlocks
+        setTimeout(() => {
+          fetchUserDetails(newSession.user.id);
+        }, 0);
+      } else if (event === "SIGNED_OUT") {
+        setUser(null);
+        setSession(null);
+      }
+    });
+
+    // THEN check for existing session
     const getSession = async () => {
       setLoading(true);
       const { data } = await supabase.auth.getSession();
 
       if (data.session?.user) {
+        setSession(data.session);
         await fetchUserDetails(data.session.user.id);
       }
-
+      
       setLoading(false);
     };
 
     getSession();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session?.user) {
-        await fetchUserDetails(session.user.id);
-      } else if (event === "SIGNED_OUT") {
-        setUser(null);
-      }
-    });
-
+    // Cleanup
     return () => {
-      authListener.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, []);
 
@@ -56,7 +70,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         .from('users')
         .select('email, plan, is_admin')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (userError) throw userError;
 
@@ -74,9 +88,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         };
 
         setUser(fullUser);
+      } else {
+        // Handle case where user is authenticated but not in users table
+        console.warn("User authenticated but not found in users table");
+        const { data: authData } = await supabase.auth.getUser();
+        
+        if (authData.user) {
+          // Create basic user profile
+          const fullUser: User = {
+            id: userId,
+            email: authData.user.email || "",
+            user_metadata: authData.user.user_metadata || {},
+            plan: 'free',
+            is_admin: false,
+            name: authData.user.user_metadata?.name || "Usuário",
+          };
+          
+          setUser(fullUser);
+        }
       }
     } catch (error) {
       console.error("Erro ao buscar dados do usuário:", error);
+      setUser(null);
     }
   };
 
@@ -85,10 +118,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setLoading(true);
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-
-      if (data.user) {
-        await fetchUserDetails(data.user.id);
-      }
 
       toast({ title: "Login realizado com sucesso!" });
     } catch (error: any) {
@@ -161,6 +190,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const authContextValue: AuthState = {
     user,
+    session,
     loading,
     signIn,
     signUp,

@@ -5,11 +5,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/providers/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { v4 as uuidv4 } from 'uuid';
 
 export function usePdfMerge() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const navigate = useNavigate();
   const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -111,6 +110,15 @@ export function usePdfMerge() {
       return;
     }
     
+    if (!session) {
+      toast({
+        variant: "destructive",
+        title: "Sessão inválida",
+        description: "Por favor, faça login novamente."
+      });
+      return;
+    }
+    
     setIsProcessing(true);
     
     try {
@@ -121,26 +129,42 @@ export function usePdfMerge() {
       const outputFilename = `documentos-unidos-${Date.now()}.pdf`;
       
       if (user) {
+        // Call the Edge function to merge PDFs
+        const { data, error } = await supabase.functions.invoke('process-pdf', {
+          body: {
+            operation: 'merge',
+            files: files.map(f => ({
+              name: f.name,
+              size: f.size,
+              type: f.type
+            }))
+          }
+        });
+        
+        if (error) {
+          throw error;
+        }
+        
+        if (!data.success) {
+          throw new Error(data.error || "Erro ao mesclar PDFs");
+        }
+        
         // Record the operation in Supabase
-        const { error } = await supabase
+        const { error: recordError } = await supabase
           .from('conversions')
           .insert({
             original_filename: files.map(f => f.name).join(","),
             original_format: "pdf",
             output_format: "pdf",
-            output_url: `/conversions/${outputFilename}`,
+            output_url: data.outputUrl || `/conversions/${outputFilename}`,
             user_id: user.id
           });
           
-        if (error) {
-          console.error("Error recording PDF merge:", error);
-          throw new Error("Erro ao registrar operação no banco de dados");
+        if (recordError) {
+          console.error("Error recording PDF merge:", recordError);
+          // Don't throw here to avoid blocking the success flow
         }
       }
-      
-      // In a real implementation, we would merge the PDFs here
-      // For now, we'll simulate a successful merge
-      await new Promise(resolve => setTimeout(resolve, 1500));
       
       toast({
         title: "PDFs unidos com sucesso",

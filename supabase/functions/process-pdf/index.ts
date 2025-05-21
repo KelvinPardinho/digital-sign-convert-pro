@@ -17,7 +17,11 @@ const createSupabaseClient = (req: Request) => {
   const jwt = authHeader?.replace('Bearer ', '') ?? '';
   
   return createClient(supabaseUrl, supabaseAnonKey, {
-    global: { headers: { Authorization: `Bearer ${jwt}` } }
+    global: { headers: { Authorization: `Bearer ${jwt}` } },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
   });
 };
 
@@ -51,14 +55,38 @@ serve(async (req) => {
     }
     
     // Processar solicitação
-    const { operation, files, password } = await req.json();
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: "Corpo da requisição inválido", details: e.message }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const { operation, files, password } = requestBody;
+    
+    if (!operation) {
+      return new Response(
+        JSON.stringify({ error: "Operação não especificada" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Arquivos não especificados" }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     // Verificar plano do usuário para operações premium
     const { data: userData, error: userDataError } = await supabase
       .from('users')
       .select('plan')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
     
     if (userDataError) {
       return new Response(
@@ -67,7 +95,7 @@ serve(async (req) => {
       );
     }
     
-    const isPremium = userData.plan === 'premium';
+    const isPremium = userData?.plan === 'premium';
     const premiumOperations = ['merge', 'ocr'];
     
     if (premiumOperations.includes(operation) && !isPremium) {
@@ -78,15 +106,19 @@ serve(async (req) => {
     }
     
     // Registrar operação
-    await supabase
+    const { error: operationError } = await supabase
       .from('pdf_operations')
       .insert({
         user_id: user.id,
         operation: operation,
         file_count: Array.isArray(files) ? files.length : 1,
         status: 'completed'
-      })
-      .select();
+      });
+      
+    if (operationError) {
+      console.error("Erro ao registrar operação:", operationError);
+      // Não interromper o fluxo por causa de erro de registro
+    }
     
     // Processar com base na operação
     let result;

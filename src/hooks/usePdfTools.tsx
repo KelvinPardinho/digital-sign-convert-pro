@@ -1,7 +1,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from './use-toast';
+import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/AuthProvider';
 
 type ProcessOptions = {
@@ -13,7 +13,7 @@ export const usePdfTools = () => {
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
 
   // Função para lidar com o arquivo solto
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -29,11 +29,20 @@ export const usePdfTools = () => {
 
   // Função para processar o PDF com diferentes operações
   const processPdf = async (operation: string, options: ProcessOptions = {}) => {
-    if (!file || !user) {
+    if (!file) {
       toast({
         variant: "destructive",
         title: "Erro",
-        description: "Nenhum arquivo selecionado ou usuário não autenticado",
+        description: "Nenhum arquivo selecionado",
+      });
+      return false;
+    }
+    
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Erro",
+        description: "Usuário não autenticado",
       });
       return false;
     }
@@ -42,9 +51,11 @@ export const usePdfTools = () => {
 
     try {
       // Obter uma sessão válida para enviar o token JWT
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session) {
-        throw new Error("Sessão inválida");
+      if (!session) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData.session) {
+          throw new Error("Sessão inválida");
+        }
       }
 
       // Prepare the file data (in a real scenario, we would upload it to storage)
@@ -55,7 +66,7 @@ export const usePdfTools = () => {
         type: file.type
       };
 
-      // Chamar a função Edge do Supabase
+      // Chamar a função Edge do Supabase com o token JWT no cabeçalho
       const { data, error } = await supabase.functions.invoke('process-pdf', {
         body: {
           operation,
@@ -119,6 +130,13 @@ export const usePdfTools = () => {
   const cleanup = useCallback(() => {
     resetFile();
   }, [resetFile]);
+
+  // Limpar quando o componente for desmontado
+  useEffect(() => {
+    return () => {
+      cleanup();
+    };
+  }, [cleanup]);
 
   return {
     file,
