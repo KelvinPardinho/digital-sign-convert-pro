@@ -10,4 +10,5 @@ export interface User {
   };
   plan?: 'free' | 'premium';
   is_admin?: boolean;
+  name?: string;
 }

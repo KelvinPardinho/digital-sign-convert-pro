@@ -9,6 +9,7 @@ interface AuthState {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  isLoading: boolean; // Added isLoading property to match usage in layout.tsx
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -84,7 +85,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           user_metadata: authUser?.user_metadata || {},
           plan: (userData.plan as 'free' | 'premium') || 'free',
           is_admin: userData.is_admin || false,
-          name: authUser?.user_metadata?.name || "Usuário",
+          name: authUser?.user_metadata?.name || "Usuário", // Now properly defined in User type
         };
 
         setUser(fullUser);
@@ -101,7 +102,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             user_metadata: authData.user.user_metadata || {},
             plan: 'free',
             is_admin: false,
-            name: authData.user.user_metadata?.name || "Usuário",
+            name: authData.user.user_metadata?.name || "Usuário", // Now properly defined in User type
           };
           
           setUser(fullUser);
@@ -192,6 +193,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     user,
     session,
     loading,
+    isLoading: loading, // Map loading to isLoading for consistency
     signIn,
     signUp,
     signOut,
