@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/AuthProvider';
@@ -28,6 +28,13 @@ export const usePdfTools = () => {
   const resetFile = useCallback(() => {
     setFile(null);
   }, []);
+
+  // Function to clean up resources
+  const cleanup = useCallback(() => {
+    // This function is here to maintain API compatibility
+    // If we need to add cleanup logic in the future, it can be added here
+    resetFile();
+  }, [resetFile]);
 
   // Function to process PDF with different operations
   const processPdf = async (operation: string, options: ProcessOptions = {}) => {
@@ -153,11 +160,18 @@ export const usePdfTools = () => {
     }
   };
 
+  useEffect(() => {
+    return () => {
+      cleanup();
+    }
+  }, [cleanup]);
+
   return {
     file,
     onDrop,
     isProcessing,
     processPdf,
-    resetFile
+    resetFile,
+    cleanup
   };
 };

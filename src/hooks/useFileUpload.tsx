@@ -60,19 +60,25 @@ export function useFileUpload(fileTypeValidator?: (file: File) => boolean, maxSi
   }, []);
   
   // Cleanup function to prevent memory leaks
+  const cleanup = useCallback(() => {
+    files.forEach(file => {
+      if (file.preview) URL.revokeObjectURL(file.preview);
+    });
+  }, [files]);
+
+  // Effect for cleanup on unmount
   useEffect(() => {
     return () => {
-      files.forEach(file => {
-        if (file.preview) URL.revokeObjectURL(file.preview);
-      });
+      cleanup();
     };
-  }, []);
+  }, [cleanup]);
 
   return {
     files,
     setFiles,
     onDrop,
     resetFiles,
-    removeFile
+    removeFile,
+    cleanup
   };
 }
