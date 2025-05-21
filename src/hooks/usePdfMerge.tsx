@@ -1,18 +1,32 @@
 
-import React, { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import { FileWithPreview } from "@/types/file";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/providers/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useFileUpload } from "@/hooks/useFileUpload";
+import { ensureBucketExists, recordConversion } from "@/utils/supabaseStorage";
+import { downloadFile } from "@/utils/fileDownload";
 import { v4 as uuidv4 } from 'uuid';
+
+// PDF file type validator
+const isPdfFile = (file: File) => file.type === "application/pdf";
 
 export function usePdfMerge() {
   const { toast } = useToast();
   const { user, session } = useAuth();
   const navigate = useNavigate();
-  const [files, setFiles] = useState<FileWithPreview[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Use the new useFileUpload hook
+  const { 
+    files, 
+    setFiles,
+    onDrop: handleFileDrop, 
+    resetFiles,
+    removeFile 
+  } = useFileUpload(isPdfFile);
   
   // Check if user is premium
   const isPremium = user?.plan === "premium";
@@ -33,17 +47,6 @@ export function usePdfMerge() {
     setFiles(newFiles);
   };
 
-  // Remove file from the list
-  const removeFile = (index: number) => {
-    const newFiles = [...files];
-    // Revoke the URL to avoid memory leaks
-    if (newFiles[index]?.preview) {
-      URL.revokeObjectURL(newFiles[index].preview);
-    }
-    newFiles.splice(index, 1);
-    setFiles(newFiles);
-  };
-
   // Handle drag and drop reordering
   const onDragEnd = (result: any) => {
     if (!result.destination) return;
@@ -54,40 +57,6 @@ export function usePdfMerge() {
     
     setFiles(newFiles);
   };
-
-  // Handle file drop
-  const handleFileDrop = useCallback((acceptedFiles: File[]) => {
-    // Verify files are PDFs
-    const nonPdfFiles = acceptedFiles.filter(file => file.type !== "application/pdf");
-    if (nonPdfFiles.length > 0) {
-      toast({
-        variant: "destructive",
-        title: "Formato inválido",
-        description: "Por favor, selecione apenas arquivos PDF."
-      });
-      return;
-    }
-
-    // Check file size limits based on user plan
-    const maxSize = user?.plan === 'premium' ? 50 * 1024 * 1024 : 10 * 1024 * 1024; // 50MB or 10MB
-    const oversizedFiles = acceptedFiles.filter(file => file.size > maxSize);
-    if (oversizedFiles.length > 0) {
-      toast({
-        variant: "destructive",
-        title: "Arquivo muito grande",
-        description: `O tamanho máximo de arquivo para seu plano é ${maxSize / (1024 * 1024)}MB.`
-      });
-      return;
-    }
-    
-    const newFiles = acceptedFiles.map(file => {
-      return Object.assign(file, {
-        preview: URL.createObjectURL(file)
-      });
-    }) as FileWithPreview[];
-    
-    setFiles(prev => [...prev, ...newFiles]);
-  }, [user, toast]);
 
   // Handle merge of PDFs
   const handleMerge = async () => {
@@ -130,14 +99,10 @@ export function usePdfMerge() {
       const uploadPromises = [];
       const fileUrls = [];
       
-      // First check if the storage bucket exists
-      const { data: bucketData, error: bucketError } = await supabase
-        .storage
-        .getBucket('pdf-operations');
-        
-      if (bucketError && bucketError.message.includes('does not exist')) {
-        // Create the bucket if it doesn't exist
-        await supabase.storage.createBucket('pdf-operations', { public: true });
+      // Ensure storage bucket exists
+      const bucketExists = await ensureBucketExists('pdf-operations');
+      if (!bucketExists) {
+        throw new Error("Erro ao verificar bucket de armazenamento");
       }
       
       // Upload all files first
@@ -193,20 +158,14 @@ export function usePdfMerge() {
         throw new Error(data.error || "Erro ao mesclar PDFs");
       }
       
-      // Record the operation in conversions table instead of pdf_operations
-      const { error: recordError } = await supabase
-        .from('conversions')
-        .insert({
-          user_id: user?.id,
-          original_filename: 'multiple-files.pdf',
-          original_format: 'pdf',
-          output_format: 'pdf',
-          output_url: data.outputUrl
-        });
-        
-      if (recordError) {
-        console.error("Error recording PDF merge:", recordError);
-      }
+      // Record the operation in conversions table
+      await recordConversion(
+        user?.id || '',
+        'multiple-files.pdf',
+        'pdf',
+        'pdf',
+        data.outputUrl
+      );
       
       toast({
         title: "PDFs unidos com sucesso",
@@ -215,13 +174,10 @@ export function usePdfMerge() {
       
       // Download the merged file
       setTimeout(() => {
-        // Create a link to download the file
-        const link = document.createElement('a');
-        link.href = data.outputUrl;
-        link.download = `documentos-unidos-${Date.now()}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        downloadFile(
+          data.outputUrl,
+          `documentos-unidos-${Date.now()}.pdf`
+        );
 
         toast({
           title: "Download iniciado",
@@ -230,12 +186,9 @@ export function usePdfMerge() {
       }, 500);
       
       // Clean up files after successful merge
-      files.forEach(file => {
-        if (file.preview) URL.revokeObjectURL(file.preview);
-      });
-      setFiles([]);
+      resetFiles();
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error merging PDFs:", error);
       toast({
         variant: "destructive",
@@ -246,15 +199,6 @@ export function usePdfMerge() {
       setIsProcessing(false);
     }
   };
-
-  // Clean up previews when component unmounts
-  useEffect(() => {
-    return () => {
-      files.forEach(file => {
-        if (file.preview) URL.revokeObjectURL(file.preview);
-      });
-    };
-  }, []);
 
   return {
     files,

@@ -1,9 +1,10 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/AuthProvider';
-import { v4 as uuidv4 } from 'uuid';
+import { ensureBucketExists, uploadFileToBucket, recordConversion } from '@/utils/supabaseStorage';
+import { downloadFile, downloadMultipleFiles } from '@/utils/fileDownload';
 
 type ProcessOptions = {
   password?: string;
@@ -63,41 +64,24 @@ export const usePdfTools = () => {
     setIsProcessing(true);
 
     try {
-      const fileId = uuidv4();
-      
-      // First, upload the file to Supabase Storage
-      // Check if the pdf-operations bucket exists, create if not
-      const { data: bucketData, error: bucketError } = await supabase
-        .storage
-        .getBucket('pdf-operations');
-        
-      if (bucketError && bucketError.message.includes('does not exist')) {
-        // Create the bucket if it doesn't exist
-        await supabase.storage.createBucket('pdf-operations', { public: true });
+      // Ensure the PDF operations bucket exists
+      const bucketExists = await ensureBucketExists('pdf-operations');
+      if (!bucketExists) {
+        throw new Error("Erro ao verificar bucket de armazenamento");
       }
 
-      // Upload the file to storage
-      const { data: uploadData, error: uploadError } = await supabase
-        .storage
-        .from('pdf-operations')
-        .upload(`original/${user.id}/${fileId}-${file.name}`, file);
-
-      if (uploadError) {
-        throw new Error(`Erro ao enviar arquivo: ${uploadError.message}`);
+      // Upload file to storage
+      const uploadResult = await uploadFileToBucket(file, user.id, 'pdf-operations');
+      if (!uploadResult) {
+        throw new Error("Erro ao enviar arquivo");
       }
-
-      // Get a public URL for the uploaded file
-      const { data: publicUrlData } = supabase
-        .storage
-        .from('pdf-operations')
-        .getPublicUrl(`original/${user.id}/${fileId}-${file.name}`);
 
       // Call the edge function with the file URL
       const { data, error } = await supabase.functions.invoke('process-pdf', {
         body: {
           operation,
-          fileUrl: publicUrlData.publicUrl,
-          fileId,
+          fileUrl: uploadResult.publicUrl,
+          fileId: uploadResult.fileId,
           fileName: file.name,
           fileSize: file.size,
           fileType: file.type,
@@ -120,24 +104,18 @@ export const usePdfTools = () => {
         // Handle download of the resulting file(s)
         setTimeout(() => {
           if (operation === 'split' && data.outputUrls && Array.isArray(data.outputUrls)) {
-            // For split, handle multiple downloads
-            data.outputUrls.forEach((url: string, i: number) => {
-              setTimeout(() => {
-                const parte = i + 1;
-                toast({
-                  title: `Baixando parte ${parte}`,
-                  description: `Iniciando download da parte ${parte}...`,
-                });
-                
-                // Create a link to download the file
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `parte${parte}_${file.name}`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-              }, i * 1000);
+            // For split operation, download multiple files
+            toast({
+              title: "Baixando arquivos",
+              description: `Iniciando download de ${data.outputUrls.length} partes...`,
             });
+            
+            downloadMultipleFiles(
+              data.outputUrls, 
+              'parte', 
+              `_${file.name}`,
+              1000
+            );
           } else if (data.outputUrl) {
             // For normal operations, handle a single download
             toast({
@@ -145,30 +123,18 @@ export const usePdfTools = () => {
               description: "Seu arquivo está sendo baixado...",
             });
             
-            // Create a link to download the file
-            const link = document.createElement('a');
-            link.href = data.outputUrl;
-            link.download = `${operation}_${file.name}`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            downloadFile(data.outputUrl, `${operation}_${file.name}`);
           }
         }, 500);
 
-        // Record the operation in conversions table instead of pdf_operations
-        const { error: recordError } = await supabase
-          .from('conversions')
-          .insert({
-            user_id: user.id,
-            original_filename: file.name,
-            original_format: "pdf",
-            output_format: "pdf",
-            output_url: data.outputUrl || (data.outputUrls ? data.outputUrls[0] : null)
-          });
-          
-        if (recordError) {
-          console.error("Error recording PDF operation:", recordError);
-        }
+        // Record the operation in conversions table
+        await recordConversion(
+          user.id,
+          file.name,
+          "pdf",
+          "pdf",
+          data.outputUrl || (data.outputUrls ? data.outputUrls[0] : null)
+        );
 
         return true;
       } else {
@@ -187,24 +153,11 @@ export const usePdfTools = () => {
     }
   };
 
-  // Cleanup function
-  const cleanup = useCallback(() => {
-    resetFile();
-  }, [resetFile]);
-
-  // Clean up when component unmounts
-  useEffect(() => {
-    return () => {
-      cleanup();
-    };
-  }, [cleanup]);
-
   return {
     file,
     onDrop,
     isProcessing,
     processPdf,
-    resetFile,
-    cleanup
+    resetFile
   };
 };
