@@ -193,15 +193,14 @@ export function usePdfMerge() {
         throw new Error(data.error || "Erro ao mesclar PDFs");
       }
       
-      // Record the operation in Supabase
+      // Record the operation in conversions table instead of pdf_operations
       const { error: recordError } = await supabase
-        .from('pdf_operations')
+        .from('conversions')
         .insert({
           user_id: user?.id,
-          operation: 'merge',
-          file_name: 'merged-document.pdf',
-          file_count: files.length,
-          status: 'completed',
+          original_filename: 'multiple-files.pdf',
+          original_format: 'pdf',
+          output_format: 'pdf',
           output_url: data.outputUrl
         });
         

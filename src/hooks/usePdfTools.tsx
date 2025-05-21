@@ -155,14 +155,14 @@ export const usePdfTools = () => {
           }
         }, 500);
 
-        // Record the operation
+        // Record the operation in conversions table instead of pdf_operations
         const { error: recordError } = await supabase
-          .from('pdf_operations')
+          .from('conversions')
           .insert({
             user_id: user.id,
-            operation: operation,
-            file_name: file.name,
-            status: 'completed',
+            original_filename: file.name,
+            original_format: "pdf",
+            output_format: "pdf",
             output_url: data.outputUrl || (data.outputUrls ? data.outputUrls[0] : null)
           });
           
