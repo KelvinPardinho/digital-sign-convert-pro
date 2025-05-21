@@ -8,6 +8,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper logging function for debugging
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[CREATE-CHECKOUT] ${step}${detailsStr}`);
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -15,7 +21,10 @@ serve(async (req) => {
   }
 
   try {
+    logStep("Function started");
+    
     const { planType } = await req.json();
+    logStep("Request body parsed", { planType });
     
     // Create Supabase client using the anon key for user authentication
     const supabaseClient = createClient(
@@ -26,20 +35,29 @@ serve(async (req) => {
     // Retrieve authenticated user
     const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
+    logStep("Getting user from token");
+    
     const { data } = await supabaseClient.auth.getUser(token);
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
+    logStep("User authenticated", { userId: user.id, email: user.email });
 
     // Initialize Stripe
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
+    
+    const stripe = new Stripe(stripeKey, {
       apiVersion: "2023-10-16",
     });
+    logStep("Stripe initialized");
 
     // Check if a Stripe customer record exists for this user
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     let customerId;
+    
     if (customers.data.length > 0) {
       customerId = customers.data[0].id;
+      logStep("Existing customer found", { customerId });
     } else {
       // Create a new customer if one doesn't exist
       const customer = await stripe.customers.create({
@@ -47,12 +65,15 @@ serve(async (req) => {
         name: user.user_metadata.name || user.email,
       });
       customerId = customer.id;
+      logStep("New customer created", { customerId });
     }
 
     // Set price based on plan type (monthly or annual)
     const price = planType === "annual" ? 
       { unit_amount: 29900, recurring: { interval: "year" } } : 
       { unit_amount: 2990, recurring: { interval: "month" } };
+    
+    logStep("Price configuration", { planType, price });
 
     // Create a subscription checkout session
     const session = await stripe.checkout.sessions.create({
@@ -75,6 +96,8 @@ serve(async (req) => {
       success_url: `${req.headers.get("origin")}/subscription-success`,
       cancel_url: `${req.headers.get("origin")}/subscription?canceled=true`,
     });
+    
+    logStep("Checkout session created", { sessionId: session.id, url: session.url });
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

@@ -8,29 +8,44 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper logging function for debugging
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[CUSTOMER-PORTAL] ${step}${detailsStr}`);
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Create Supabase client using the anon key for user authentication
+    logStep("Function started");
+
+    // Create Supabase client
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
-
+    
     // Retrieve authenticated user
     const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
+    logStep("Getting user from token");
+    
     const { data } = await supabaseClient.auth.getUser(token);
     const user = data.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
+    logStep("User authenticated", { userId: user.id, email: user.email });
 
     // Initialize Stripe
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
+    
+    const stripe = new Stripe(stripeKey, {
       apiVersion: "2023-10-16",
     });
+    logStep("Stripe initialized");
 
     // Find the customer
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
@@ -39,12 +54,15 @@ serve(async (req) => {
     }
     
     const customerId = customers.data[0].id;
+    logStep("Found Stripe customer", { customerId });
     
     // Create a portal session
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: `${req.headers.get("origin")}/subscription`,
     });
+    
+    logStep("Portal session created", { sessionId: session.id, url: session.url });
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

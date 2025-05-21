@@ -8,6 +8,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper logging function for enhanced debugging
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[CHECK-SUBSCRIPTION] ${step}${detailsStr}`);
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -21,25 +27,35 @@ serve(async (req) => {
   );
 
   try {
+    logStep("Function started");
+
     // Retrieve authenticated user
     const authHeader = req.headers.get("Authorization")!;
     const token = authHeader.replace("Bearer ", "");
+    logStep("Getting user from token");
     
     const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
     if (userError) throw new Error(`Authentication error: ${userError.message}`);
     
     const user = userData.user;
     if (!user?.email) throw new Error("User not authenticated or email not available");
+    logStep("User authenticated", { userId: user.id, email: user.email });
 
     // Initialize Stripe
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeKey) throw new Error("STRIPE_SECRET_KEY is not set");
+    
+    const stripe = new Stripe(stripeKey, {
       apiVersion: "2023-10-16",
     });
+    logStep("Stripe initialized");
 
     // Find the customer
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     if (customers.data.length === 0) {
       // No customer found, user is on free plan
+      logStep("No customer found, updating to free plan");
+      
       await supabaseAdmin
         .from("users")
         .update({ plan: "free" })
@@ -55,6 +71,7 @@ serve(async (req) => {
     }
 
     const customerId = customers.data[0].id;
+    logStep("Found Stripe customer", { customerId });
     
     // Check for active subscriptions
     const subscriptions = await stripe.subscriptions.list({
@@ -65,6 +82,8 @@ serve(async (req) => {
 
     if (subscriptions.data.length === 0) {
       // No active subscription, update user to free plan
+      logStep("No active subscription found, updating to free plan");
+      
       await supabaseAdmin
         .from("users")
         .update({ plan: "free" })
@@ -80,6 +99,8 @@ serve(async (req) => {
     }
 
     // User has an active subscription, update to premium plan
+    logStep("Active subscription found, updating to premium plan");
+    
     await supabaseAdmin
       .from("users")
       .update({ plan: "premium" })
