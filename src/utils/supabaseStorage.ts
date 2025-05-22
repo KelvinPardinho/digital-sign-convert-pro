@@ -22,14 +22,15 @@ export const ensureBucketExists = async (bucketName: string): Promise<boolean> =
       }
       
       // Set bucket policies to allow authenticated users to upload/download
-      // Fix for type error: Using proper type assertion for the RPC call
-      const { error: policyError } = await supabase.rpc(
+      const { error: policyError } = await supabase.functions.invoke(
         'create_storage_policy',
         {
-          bucket_name: bucketName,
-          policy_name: `${bucketName}_policy`,
-          definition: `auth.uid() IS NOT NULL`
-        } as any // Use 'any' type assertion to bypass TypeScript checking
+          body: {
+            bucket_name: bucketName,
+            policy_name: `${bucketName}_policy`,
+            definition: `auth.uid() IS NOT NULL`
+          }
+        }
       );
       
       if (policyError) {
