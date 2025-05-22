@@ -22,11 +22,12 @@ export const ensureBucketExists = async (bucketName: string): Promise<boolean> =
       }
       
       // Set bucket policies to allow authenticated users to upload/download
+      // Fix for type error: Using appropriate parameter types for the rpc call
       const { error: policyError } = await supabase.rpc('create_storage_policy', {
         bucket_name: bucketName,
         policy_name: `${bucketName}_policy`,
         definition: `auth.uid() IS NOT NULL`
-      });
+      } as any); // Using type assertion to fix type mismatch
       
       if (policyError) {
         console.error("Error setting bucket policy:", policyError);
@@ -138,7 +139,11 @@ export const getUserConversions = async (userId: string) => {
       return [];
     }
     
-    return data || [];
+    // Add file type information based on original_format
+    return data?.map(conversion => ({
+      ...conversion,
+      type: conversion.original_format.toLowerCase() // Add type property derived from original_format
+    })) || [];
   } catch (error) {
     console.error("Error in getUserConversions:", error);
     return [];

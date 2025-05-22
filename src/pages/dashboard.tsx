@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@/providers/AuthProvider";
@@ -33,7 +32,7 @@ import { UserCard } from "@/components/dashboard/UserCard";
 import { supabase } from "@/integrations/supabase/client";
 import { getUserConversions } from "@/utils/supabaseStorage";
 
-// Type definitions for the dashboard data
+// Updated type definitions for the dashboard data to include type property
 interface Conversion {
   id: string;
   original_filename: string;
@@ -42,6 +41,7 @@ interface Conversion {
   output_url: string | null;
   created_at: string;
   status: string;
+  type: string; // Add type property to match what's returned from getUserConversions
 }
 
 interface DashboardStats {
