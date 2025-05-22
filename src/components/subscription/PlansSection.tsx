@@ -20,14 +20,14 @@ export function PlansSection({
 }: PlansSectionProps) {
   const { user } = useAuth();
   
-  // Define free plan features
+  // Define free plan features (updated to include PDF merging)
   const freePlanFeatures = [
     { text: "Conversões ilimitadas", included: true },
     { text: "Tamanho máximo: 10MB", included: true },
     { text: "Todos os formatos suportados", included: true },
     { text: "3 assinaturas digitais por mês", included: true },
+    { text: "Junção de PDFs", included: true }, // Updated: now included in free plan
     { text: "Com anúncios", included: true },
-    { text: "Sem junção de PDFs", included: false },
   ];
   
   // Define premium plan features
@@ -36,8 +36,8 @@ export function PlansSection({
     { text: "Tamanho máximo: 50MB", included: true },
     { text: "Todos os formatos suportados", included: true },
     { text: "Assinatura digital ilimitada", included: true },
-    { text: "Sem anúncios", included: true },
     { text: "Junção de PDFs ilimitada", included: true },
+    { text: "Sem anúncios", included: true },
   ];
   
   return (

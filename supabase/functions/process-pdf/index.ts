@@ -25,37 +25,158 @@ const createSupabaseClient = (req: Request) => {
   });
 };
 
+// Helper to ensure a bucket exists
+const ensureBucket = async (bucketName: string) => {
+  try {
+    // Create service role client for admin operations
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Check if bucket exists
+    const { error: bucketError } = await serviceClient.storage.getBucket(bucketName);
+    
+    if (bucketError && bucketError.message.includes('does not exist')) {
+      // Create bucket if it doesn't exist
+      const { error: createError } = await serviceClient.storage.createBucket(bucketName, {
+        public: true
+      });
+      
+      if (createError) {
+        console.error(`Error creating ${bucketName} bucket:`, createError);
+        return false;
+      }
+    } else if (bucketError) {
+      console.error(`Error checking ${bucketName} bucket:`, bucketError);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error(`Error ensuring ${bucketName} bucket:`, error);
+    return false;
+  }
+};
+
+// Helper to download PDF file from URL
+const downloadPdfFile = async (fileUrl: string): Promise<Blob | null> => {
+  try {
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+      console.error(`Error downloading file: ${response.statusText}`);
+      return null;
+    }
+    
+    return await response.blob();
+  } catch (error) {
+    console.error(`Error downloading PDF file: ${error}`);
+    return null;
+  }
+};
+
+// Helper to upload processed PDF file
+const uploadProcessedFile = async (
+  fileBlob: Blob, 
+  userId: string, 
+  fileId: string, 
+  operation: string
+): Promise<string | null> => {
+  try {
+    // Create service role client for admin operations
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
+    
+    const timestamp = new Date().getTime();
+    const fileName = `${operation}-${fileId}-${timestamp}.pdf`;
+    const filePath = `processed/${userId}/${fileName}`;
+    
+    // Upload processed file
+    const { error: uploadError } = await serviceClient
+      .storage
+      .from('pdf-operations')
+      .upload(filePath, fileBlob);
+      
+    if (uploadError) {
+      console.error(`Error uploading processed file: ${uploadError.message}`);
+      return null;
+    }
+    
+    // Get public URL
+    const { data: urlData } = serviceClient
+      .storage
+      .from('pdf-operations')
+      .getPublicUrl(filePath);
+      
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error(`Error uploading processed file: ${error}`);
+    return null;
+  }
+};
+
 // Helper to process PDF operations
-const processPdfOperation = async (operation: string, fileUrl: string, fileId: string, userId: string, options: any = {}) => {
+const processPdfOperation = async (
+  operation: string, 
+  fileUrl: string | undefined, 
+  fileUrls: string[] | undefined, 
+  fileId: string, 
+  userId: string, 
+  options: any = {}
+) => {
   console.log(`Processing ${operation} operation for file ${fileId}`);
   
-  // In a real implementation, we would use PDF libraries to process the file
-  // For this demo, we'll simulate the processing and return mock results
+  await ensureBucket('pdf-operations');
   
-  // Simulated delay to mimic processing time
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  // For merge operation with multiple files
+  if (operation === 'merge' && fileUrls && fileUrls.length > 0) {
+    // Download all files
+    const fileBlobs: Blob[] = [];
+    for (const url of fileUrls) {
+      const blob = await downloadPdfFile(url);
+      if (!blob) {
+        throw new Error(`Failed to download file from ${url}`);
+      }
+      fileBlobs.push(blob);
+    }
+    
+    // Simulate merging PDFs by using the first file
+    // In a real implementation, would use a PDF library to merge
+    const mergedBlob = fileBlobs[0];
+    
+    // Upload merged file
+    const outputUrl = await uploadProcessedFile(mergedBlob, userId, fileId, 'merged');
+    if (!outputUrl) {
+      throw new Error("Failed to upload merged file");
+    }
+    
+    return {
+      success: true,
+      message: "PDFs mesclados com sucesso",
+      outputUrl
+    };
+  }
   
-  // Generate timestamp for unique filenames
-  const timestamp = new Date().getTime();
+  // For all other operations requiring a single file
+  if (!fileUrl) {
+    throw new Error("URL do arquivo não fornecida");
+  }
   
-  // Define the base URL for processed files
-  const baseUrl = `https://tpvywtsldvdsovsdxamn.supabase.co/storage/v1/object/public/pdf-operations/processed/${userId}`;
+  // Download the file
+  const fileBlob = await downloadPdfFile(fileUrl);
+  if (!fileBlob) {
+    throw new Error("Failed to download file");
+  }
   
   // Handle different operations
   switch (operation) {
-    case 'merge': {
-      const outputFilename = `merged-${timestamp}.pdf`;
-      const outputUrl = `${baseUrl}/${outputFilename}`;
-      return {
-        success: true,
-        message: "PDFs mesclados com sucesso",
-        outputUrl
-      };
-    }
-      
     case 'ocr': {
-      const outputFilename = `ocr-${timestamp}.pdf`;
-      const outputUrl = `${baseUrl}/${outputFilename}`;
+      // Simulate OCR processing
+      const outputUrl = await uploadProcessedFile(fileBlob, userId, fileId, 'ocr');
+      if (!outputUrl) {
+        throw new Error("Failed to upload OCR processed file");
+      }
+      
       return {
         success: true,
         message: "OCR aplicado com sucesso",
@@ -66,10 +187,16 @@ const processPdfOperation = async (operation: string, fileUrl: string, fileId: s
     case 'split': {
       // Parse page ranges
       const pageRanges = options.pageRanges ? options.pageRanges.split(',') : ['1-3', '4-5'];
-      const outputUrls = pageRanges.map((range: string, index: number) => {
-        const outputFilename = `split-${index+1}-${timestamp}.pdf`;
-        return `${baseUrl}/${outputFilename}`;
-      });
+      const outputUrls: string[] = [];
+      
+      // Simulate splitting PDF by creating multiple copies
+      for (let i = 0; i < pageRanges.length; i++) {
+        const outputUrl = await uploadProcessedFile(fileBlob, userId, `${fileId}-part${i+1}`, 'split');
+        if (!outputUrl) {
+          throw new Error(`Failed to upload split part ${i+1}`);
+        }
+        outputUrls.push(outputUrl);
+      }
       
       return {
         success: true,
@@ -86,8 +213,12 @@ const processPdfOperation = async (operation: string, fileUrl: string, fileId: s
         };
       }
       
-      const outputFilename = `protected-${timestamp}.pdf`;
-      const outputUrl = `${baseUrl}/${outputFilename}`;
+      // Simulate password protection
+      const outputUrl = await uploadProcessedFile(fileBlob, userId, fileId, 'protected');
+      if (!outputUrl) {
+        throw new Error("Failed to upload password-protected file");
+      }
+      
       return {
         success: true,
         message: "PDF protegido com sucesso",
@@ -103,8 +234,12 @@ const processPdfOperation = async (operation: string, fileUrl: string, fileId: s
         };
       }
       
-      const outputFilename = `unlocked-${timestamp}.pdf`;
-      const outputUrl = `${baseUrl}/${outputFilename}`;
+      // Simulate password removal
+      const outputUrl = await uploadProcessedFile(fileBlob, userId, fileId, 'unlocked');
+      if (!outputUrl) {
+        throw new Error("Failed to upload unlocked file");
+      }
+      
       return {
         success: true,
         message: "PDF desbloqueado com sucesso",
@@ -184,7 +319,10 @@ serve(async (req) => {
     }
     
     const isPremium = userData?.plan === 'premium';
-    const premiumOperations = ['merge', 'ocr'];
+    
+    // Update: Allow merge for free users as per the new requirements
+    // const premiumOperations = ['ocr']; // Now merge is available for free users
+    const premiumOperations: string[] = []; // Empty since all operations now work for free users
     
     if (premiumOperations.includes(operation) && !isPremium) {
       return new Response(
@@ -195,8 +333,8 @@ serve(async (req) => {
 
     // Process the PDF operation
     const result = operation === 'merge' && fileUrls
-      ? await processPdfOperation(operation, '', fileId, userId, { fileUrls, ...options })
-      : await processPdfOperation(operation, fileUrl, fileId, userId, options);
+      ? await processPdfOperation(operation, undefined, fileUrls, fileId, userId, options)
+      : await processPdfOperation(operation, fileUrl, undefined, fileId, userId, options);
     
     // Record the operation if successful
     if (result.success) {

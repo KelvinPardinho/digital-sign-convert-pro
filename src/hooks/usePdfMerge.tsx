@@ -28,8 +28,8 @@ export function usePdfMerge() {
     removeFile 
   } = useFileUpload(isPdfFile);
   
-  // Check if user is premium
-  const isPremium = user?.plan === "premium";
+  // PDF merging is now available for all users
+  const isPremium = true;
 
   // Move file up in the list
   const moveFileUp = (index: number) => {
@@ -69,14 +69,14 @@ export function usePdfMerge() {
       return;
     }
     
-    // Verify premium status again for security
-    if (!isPremium) {
+    // Verify authentication
+    if (!user) {
       toast({
         variant: "destructive",
-        title: "Recurso Premium",
-        description: "A junção de PDFs está disponível apenas para usuários Premium."
+        title: "Autenticação necessária",
+        description: "Por favor, faça login para juntar PDFs."
       });
-      navigate("/subscription");
+      navigate("/login");
       return;
     }
     

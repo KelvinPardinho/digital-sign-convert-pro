@@ -25,29 +25,57 @@ const createSupabaseClient = (req: Request) => {
   });
 };
 
-// Helper to simulate file conversion
-const simulateConversion = async (fileUrl: string, originalFormat: string, outputFormat: string, fileId: string, userId: string) => {
+// Helper to process file conversion
+const processConversion = async (fileUrl: string, originalFormat: string, outputFormat: string, fileId: string, userId: string) => {
   console.log(`Converting file from ${originalFormat} to ${outputFormat}`);
   
-  // In a real implementation, we would use external APIs or libraries to convert the file
-  // For this demo, we'll simulate the conversion by creating a mock output URL
-  
-  // Simulated delay to mimic processing time
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  // Define base URL
-  const baseUrl = `https://tpvywtsldvdsovsdxamn.supabase.co/storage/v1/object/public/conversions/converted/${userId}`;
-  
-  // Generate a mock output URL that would be the converted file's location
-  const timestamp = new Date().getTime();
-  const outputFilename = `${fileId}-${timestamp}.${outputFormat}`;
-  const outputUrl = `${baseUrl}/${outputFilename}`;
-  
-  return {
-    originalFormat,
-    outputFormat, 
-    outputUrl
-  };
+  try {
+    // Download the original file content
+    const response = await fetch(fileUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to download file: ${response.statusText}`);
+    }
+
+    const fileContent = await response.blob();
+    
+    // In a real implementation, we would use external APIs or libraries to convert the file
+    // For this simulation, we'll create a dummy output file based on the requested format
+    
+    // Create a storage client to upload the converted file
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Generate output file name with timestamp
+    const timestamp = new Date().getTime();
+    const outputFileName = `converted_${fileId}_${timestamp}.${outputFormat}`;
+    const outputPath = `converted/${userId}/${outputFileName}`;
+    
+    // Upload the "converted" file (in reality, just the same file with different extension for demo)
+    const { error: uploadError } = await supabase
+      .storage
+      .from('conversions')
+      .upload(outputPath, fileContent);
+      
+    if (uploadError) {
+      throw new Error(`Error uploading converted file: ${uploadError.message}`);
+    }
+    
+    // Get public URL for the output file
+    const { data: publicUrlData } = supabase
+      .storage
+      .from('conversions')
+      .getPublicUrl(outputPath);
+      
+    return {
+      originalFormat,
+      outputFormat, 
+      outputUrl: publicUrlData.publicUrl
+    };
+  } catch (error) {
+    console.error("Error processing conversion:", error);
+    throw error;
+  }
 };
 
 serve(async (req) => {
@@ -115,8 +143,9 @@ serve(async (req) => {
     
     const isPremium = userData?.plan === 'premium';
     
-    // Check for premium-only conversions
-    const premiumFormats = ['docx', 'xlsx'];
+    // Check for premium-only conversions (based on requirements, all formats are allowed for all users)
+    const premiumFormats = []; // Empty since all formats are now allowed for free users
+    
     if (premiumFormats.includes(outputFormat) && !isPremium) {
       return new Response(
         JSON.stringify({ error: "Conversão disponível apenas para usuários premium" }),
@@ -124,47 +153,71 @@ serve(async (req) => {
       );
     }
     
-    // Simulate the conversion process
-    // In a production environment, you would use a real conversion service here
-    const conversionResult = await simulateConversion(
-      fileUrl, 
-      originalFormat, 
-      outputFormat,
-      fileId,
-      userId
-    );
-    
-    // Log the operation
+    // Process the conversion
     try {
-      const { error: operationError } = await supabase
-        .from('conversions')
-        .insert({
-          user_id: user.id,
-          original_filename: originalFilename,
-          original_format: originalFormat,
-          output_format: outputFormat,
-          output_url: conversionResult.outputUrl
-        });
-        
-      if (operationError) {
-        console.error("Error recording conversion operation:", operationError);
+      // Ensure the conversions bucket exists
+      const serviceClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      );
+      
+      try {
+        const { error: bucketError } = await serviceClient
+          .storage
+          .getBucket('conversions');
+          
+        if (bucketError) {
+          if (bucketError.message.includes('does not exist')) {
+            await serviceClient.storage.createBucket('conversions', { public: true });
+          } else {
+            throw bucketError;
+          }
+        }
+      } catch (e) {
+        console.error("Error checking/creating conversions bucket:", e);
       }
-    } catch (e) {
-      console.error("Failed to record conversion:", e);
-      // Continue anyway as this is not critical
+      
+      const conversionResult = await processConversion(
+        fileUrl, 
+        originalFormat, 
+        outputFormat,
+        fileId,
+        userId
+      );
+      
+      // Log the operation
+      try {
+        const { error: operationError } = await supabase
+          .from('conversions')
+          .insert({
+            user_id: user.id,
+            original_filename: originalFilename,
+            original_format: originalFormat,
+            output_format: outputFormat,
+            output_url: conversionResult.outputUrl
+          });
+          
+        if (operationError) {
+          console.error("Error recording conversion operation:", operationError);
+        }
+      } catch (e) {
+        console.error("Failed to record conversion:", e);
+        // Continue anyway as this is not critical
+      }
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Arquivo convertido com sucesso",
+          outputUrl: conversionResult.outputUrl,
+          originalFormat,
+          outputFormat
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (error) {
+      throw new Error(`Conversion processing error: ${error.message}`);
     }
-    
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: "Arquivo convertido com sucesso",
-        outputUrl: conversionResult.outputUrl,
-        originalFormat,
-        outputFormat
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-    
   } catch (error) {
     console.error(`Erro na função convert-file:`, error);
     

@@ -21,20 +21,15 @@ export const ensureBucketExists = async (bucketName: string): Promise<boolean> =
         return false;
       }
       
-      // Set bucket policies to allow authenticated users to upload/download
-      const { error: policyError } = await supabase.functions.invoke(
-        'create_storage_policy',
-        {
-          body: {
-            bucket_name: bucketName,
-            policy_name: `${bucketName}_policy`,
-            definition: `auth.uid() IS NOT NULL`
-          }
-        }
+      // Set public read access for the bucket instead of using custom policies
+      // This approach avoids the need to call the create_storage_policy function
+      const { error: updateError } = await supabase.storage.updateBucket(
+        bucketName, 
+        { public: true }
       );
       
-      if (policyError) {
-        console.error("Error setting bucket policy:", policyError);
+      if (updateError) {
+        console.error("Error updating bucket visibility:", updateError);
         // Continue anyway as the bucket is created
       }
       

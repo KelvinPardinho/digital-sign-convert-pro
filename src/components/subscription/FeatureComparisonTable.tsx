@@ -35,7 +35,7 @@ export function FeatureComparisonTable() {
             </tr>
             <tr className="border-b">
               <td className="py-4 px-4">Junção de PDFs</td>
-              <td className="text-center py-4 px-4">Não</td>
+              <td className="text-center py-4 px-4">Sim</td>
               <td className="text-center py-4 px-4">Sim</td>
             </tr>
             <tr className="border-b">

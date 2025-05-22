@@ -18,26 +18,11 @@ export default function Merge() {
     onDragEnd, 
     handleFileDrop, 
     handleMerge,
-    isPremium
   } = usePdfMerge();
   
   const { user } = useAuth();
   const { toast } = useToast();
   
-  // Check if user is premium
-  const userIsPremium = user?.plan === "premium";
-  
-  // Show warning if not premium
-  useEffect(() => {
-    if (!userIsPremium && !isPremium) {
-      toast({
-        variant: "default",
-        title: "Recurso Premium",
-        description: "Este recurso está disponível apenas para usuários Premium."
-      });
-    }
-  }, [userIsPremium, isPremium, toast]);
-
   return (
     <Layout requireAuth>
       <div className="container py-8">
@@ -56,7 +41,7 @@ export default function Merge() {
           <CardContent>
             <DropZone 
               onDrop={handleFileDrop}
-              isPremium={userIsPremium}
+              isPremium={true} // Changed to true for all users since merging is now available for free users
             />
             
             <FileList 

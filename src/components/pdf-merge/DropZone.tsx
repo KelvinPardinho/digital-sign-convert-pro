@@ -1,7 +1,10 @@
 
 import React from "react";
 import { useDropzone } from "react-dropzone";
-import { Files, Shield } from "lucide-react";
+import { Files } from "lucide-react";
+import { useAuth } from "@/providers/AuthProvider";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 interface DropZoneProps {
   onDrop: (acceptedFiles: File[]) => void;
@@ -9,11 +12,32 @@ interface DropZoneProps {
 }
 
 export function DropZone({ onDrop, isPremium }: DropZoneProps) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleDrop = (acceptedFiles: File[]) => {
+    // If not logged in, notify and redirect
+    if (!user) {
+      toast({
+        title: "Autenticação necessária",
+        description: "Você precisa estar logado para usar esta função.",
+        variant: "destructive"
+      });
+      navigate("/login");
+      return;
+    }
+    
+    // Since merging is now available for all users, we don't need premium check
+    // Just proceed with the drop
+    onDrop(acceptedFiles);
+  };
+
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: {
       'application/pdf': ['.pdf'],
     },
-    onDrop,
+    onDrop: handleDrop,
   });
 
   return (
@@ -30,12 +54,6 @@ export function DropZone({ onDrop, isPremium }: DropZoneProps) {
         <p className="text-muted-foreground mt-2">
           Selecione todos os arquivos PDF que deseja combinar
         </p>
-        {!isPremium && (
-          <div className="mt-4 text-sm text-amber-500 font-medium flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Recurso disponível apenas para usuários Premium
-          </div>
-        )}
       </div>
     </div>
   );
