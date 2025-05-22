@@ -27,16 +27,21 @@ const createSupabaseClient = (req: Request) => {
 
 // Helper to simulate file conversion
 const simulateConversion = async (fileUrl: string, originalFormat: string, outputFormat: string, fileId: string, userId: string) => {
+  console.log(`Converting file from ${originalFormat} to ${outputFormat}`);
+  
   // In a real implementation, we would use external APIs or libraries to convert the file
   // For this demo, we'll simulate the conversion by creating a mock output URL
   
   // Simulated delay to mimic processing time
   await new Promise(resolve => setTimeout(resolve, 1500));
   
+  // Define base URL
+  const baseUrl = `https://tpvywtsldvdsovsdxamn.supabase.co/storage/v1/object/public/conversions/converted/${userId}`;
+  
   // Generate a mock output URL that would be the converted file's location
   const timestamp = new Date().getTime();
   const outputFilename = `${fileId}-${timestamp}.${outputFormat}`;
-  const outputUrl = `https://tpvywtsldvdsovsdxamn.supabase.co/storage/v1/object/public/conversions/converted/${userId}/${outputFilename}`;
+  const outputUrl = `${baseUrl}/${outputFilename}`;
   
   return {
     originalFormat,
@@ -130,18 +135,23 @@ serve(async (req) => {
     );
     
     // Log the operation
-    const { error: operationError } = await supabase
-      .from('conversions')
-      .insert({
-        user_id: user.id,
-        original_filename: originalFilename,
-        original_format: originalFormat,
-        output_format: outputFormat,
-        output_url: conversionResult.outputUrl
-      });
-      
-    if (operationError) {
-      console.error("Error recording conversion operation:", operationError);
+    try {
+      const { error: operationError } = await supabase
+        .from('conversions')
+        .insert({
+          user_id: user.id,
+          original_filename: originalFilename,
+          original_format: originalFormat,
+          output_format: outputFormat,
+          output_url: conversionResult.outputUrl
+        });
+        
+      if (operationError) {
+        console.error("Error recording conversion operation:", operationError);
+      }
+    } catch (e) {
+      console.error("Failed to record conversion:", e);
+      // Continue anyway as this is not critical
     }
     
     return new Response(

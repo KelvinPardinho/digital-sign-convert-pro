@@ -6,20 +6,44 @@ import { v4 as uuidv4 } from 'uuid';
  * Ensures a storage bucket exists, creating it if needed
  */
 export const ensureBucketExists = async (bucketName: string): Promise<boolean> => {
-  // Check if the bucket exists
-  const { data: bucketData, error: bucketError } = await supabase
-    .storage
-    .getBucket(bucketName);
+  try {
+    // Check if the bucket exists
+    const { data: bucketData, error: bucketError } = await supabase
+      .storage
+      .getBucket(bucketName);
+      
+    if (bucketError && bucketError.message.includes('does not exist')) {
+      // Create the bucket if it doesn't exist
+      const { error: createError } = await supabase.storage.createBucket(bucketName, { public: true });
+      
+      if (createError) {
+        console.error("Error creating bucket:", createError);
+        return false;
+      }
+      
+      // Set bucket policies to allow authenticated users to upload/download
+      const { error: policyError } = await supabase.rpc('create_storage_policy', {
+        bucket_name: bucketName,
+        policy_name: `${bucketName}_policy`,
+        definition: `auth.uid() IS NOT NULL`
+      });
+      
+      if (policyError) {
+        console.error("Error setting bucket policy:", policyError);
+        // Continue anyway as the bucket is created
+      }
+      
+      return true;
+    } else if (bucketError) {
+      console.error("Error checking bucket:", bucketError);
+      return false;
+    }
     
-  if (bucketError && bucketError.message.includes('does not exist')) {
-    // Create the bucket if it doesn't exist
-    await supabase.storage.createBucket(bucketName, { public: true });
-  } else if (bucketError) {
-    console.error("Error checking bucket:", bucketError);
+    return true;
+  } catch (error) {
+    console.error("Error in ensureBucketExists:", error);
     return false;
   }
-  
-  return true;
 };
 
 /**
@@ -32,6 +56,12 @@ export const uploadFileToBucket = async (
   filePrefix = ''
 ): Promise<{ publicUrl: string; fileId: string } | null> => {
   try {
+    // Ensure bucket exists before uploading
+    const bucketExists = await ensureBucketExists(bucketName);
+    if (!bucketExists) {
+      throw new Error(`Bucket ${bucketName} does not exist and could not be created`);
+    }
+    
     const fileId = uuidv4();
     const fileName = `${filePrefix}${fileId}-${file.name}`;
     const filePath = `original/${userId}/${fileName}`;
@@ -89,5 +119,28 @@ export const recordConversion = async (
   } catch (error) {
     console.error("Error in recordConversion:", error);
     return false;
+  }
+};
+
+/**
+ * Gets a list of conversions for a specific user
+ */
+export const getUserConversions = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('conversions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+      
+    if (error) {
+      console.error("Error fetching user conversions:", error);
+      return [];
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error("Error in getUserConversions:", error);
+    return [];
   }
 };

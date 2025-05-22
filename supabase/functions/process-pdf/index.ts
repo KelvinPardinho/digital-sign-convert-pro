@@ -25,8 +25,10 @@ const createSupabaseClient = (req: Request) => {
   });
 };
 
-// Helper to simulate PDF processing
-const simulatePdfProcessing = async (operation: string, fileUrl: string, fileId: string, userId: string, options: any = {}) => {
+// Helper to process PDF operations
+const processPdfOperation = async (operation: string, fileUrl: string, fileId: string, userId: string, options: any = {}) => {
+  console.log(`Processing ${operation} operation for file ${fileId}`);
+  
   // In a real implementation, we would use PDF libraries to process the file
   // For this demo, we'll simulate the processing and return mock results
   
@@ -36,11 +38,14 @@ const simulatePdfProcessing = async (operation: string, fileUrl: string, fileId:
   // Generate timestamp for unique filenames
   const timestamp = new Date().getTime();
   
+  // Define the base URL for processed files
+  const baseUrl = `https://tpvywtsldvdsovsdxamn.supabase.co/storage/v1/object/public/pdf-operations/processed/${userId}`;
+  
   // Handle different operations
   switch (operation) {
     case 'merge': {
       const outputFilename = `merged-${timestamp}.pdf`;
-      const outputUrl = `https://tpvywtsldvdsovsdxamn.supabase.co/storage/v1/object/public/pdf-operations/processed/${userId}/${outputFilename}`;
+      const outputUrl = `${baseUrl}/${outputFilename}`;
       return {
         success: true,
         message: "PDFs mesclados com sucesso",
@@ -50,7 +55,7 @@ const simulatePdfProcessing = async (operation: string, fileUrl: string, fileId:
       
     case 'ocr': {
       const outputFilename = `ocr-${timestamp}.pdf`;
-      const outputUrl = `https://tpvywtsldvdsovsdxamn.supabase.co/storage/v1/object/public/pdf-operations/processed/${userId}/${outputFilename}`;
+      const outputUrl = `${baseUrl}/${outputFilename}`;
       return {
         success: true,
         message: "OCR aplicado com sucesso",
@@ -63,7 +68,7 @@ const simulatePdfProcessing = async (operation: string, fileUrl: string, fileId:
       const pageRanges = options.pageRanges ? options.pageRanges.split(',') : ['1-3', '4-5'];
       const outputUrls = pageRanges.map((range: string, index: number) => {
         const outputFilename = `split-${index+1}-${timestamp}.pdf`;
-        return `https://tpvywtsldvdsovsdxamn.supabase.co/storage/v1/object/public/pdf-operations/processed/${userId}/${outputFilename}`;
+        return `${baseUrl}/${outputFilename}`;
       });
       
       return {
@@ -77,12 +82,12 @@ const simulatePdfProcessing = async (operation: string, fileUrl: string, fileId:
       if (!options.password) {
         return {
           success: false,
-          message: "Senha não fornecida"
+          error: "Senha não fornecida"
         };
       }
       
       const outputFilename = `protected-${timestamp}.pdf`;
-      const outputUrl = `https://tpvywtsldvdsovsdxamn.supabase.co/storage/v1/object/public/pdf-operations/processed/${userId}/${outputFilename}`;
+      const outputUrl = `${baseUrl}/${outputFilename}`;
       return {
         success: true,
         message: "PDF protegido com sucesso",
@@ -94,12 +99,12 @@ const simulatePdfProcessing = async (operation: string, fileUrl: string, fileId:
       if (!options.password) {
         return {
           success: false,
-          message: "Senha não fornecida"
+          error: "Senha não fornecida"
         };
       }
       
       const outputFilename = `unlocked-${timestamp}.pdf`;
-      const outputUrl = `https://tpvywtsldvdsovsdxamn.supabase.co/storage/v1/object/public/pdf-operations/processed/${userId}/${outputFilename}`;
+      const outputUrl = `${baseUrl}/${outputFilename}`;
       return {
         success: true,
         message: "PDF desbloqueado com sucesso",
@@ -110,7 +115,7 @@ const simulatePdfProcessing = async (operation: string, fileUrl: string, fileId:
     default:
       return {
         success: false,
-        message: "Operação inválida"
+        error: "Operação inválida"
       };
   }
 };
@@ -155,9 +160,9 @@ serve(async (req) => {
       );
     }
     
-    const { operation, fileUrl, fileId, fileName, fileSize, fileType, userId, ...options } = requestBody;
+    const { operation, fileUrl, fileUrls, fileId, fileName, fileSize, fileType, userId, ...options } = requestBody;
     
-    if (!operation || !fileUrl) {
+    if (!operation || (!fileUrl && !fileUrls)) {
       return new Response(
         JSON.stringify({ error: "Operação ou arquivo não especificado" }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -188,23 +193,30 @@ serve(async (req) => {
       );
     }
 
-    // Process the PDF operation (simulated)
-    const result = await simulatePdfProcessing(operation, fileUrl, fileId, userId, options);
+    // Process the PDF operation
+    const result = operation === 'merge' && fileUrls
+      ? await processPdfOperation(operation, '', fileId, userId, { fileUrls, ...options })
+      : await processPdfOperation(operation, fileUrl, fileId, userId, options);
     
-    // Record the operation
+    // Record the operation if successful
     if (result.success) {
-      const { error: operationError } = await supabase
-        .from('pdf_operations')
-        .insert({
-          user_id: user.id,
-          operation: operation,
-          file_name: fileName || 'unknown',
-          file_size: fileSize || 0,
-          status: 'completed'
-        });
-        
-      if (operationError) {
-        console.error("Error recording operation:", operationError);
+      try {
+        const { error: operationError } = await supabase
+          .from('pdf_operations')
+          .insert({
+            user_id: user.id,
+            operation: operation,
+            file_name: fileName || 'unknown',
+            file_size: fileSize || 0,
+            status: 'completed'
+          });
+          
+        if (operationError) {
+          console.error("Error recording operation:", operationError);
+        }
+      } catch (e) {
+        console.error("Failed to record operation:", e);
+        // Continue anyway as this is not critical
       }
     }
 

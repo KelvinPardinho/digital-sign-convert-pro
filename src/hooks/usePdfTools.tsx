@@ -31,8 +31,7 @@ export const usePdfTools = () => {
 
   // Function to clean up resources
   const cleanup = useCallback(() => {
-    // This function is here to maintain API compatibility
-    // If we need to add cleanup logic in the future, it can be added here
+    // Implement any necessary cleanup logic here
     resetFile();
   }, [resetFile]);
 
@@ -102,7 +101,7 @@ export const usePdfTools = () => {
       }
 
       // Handle the response from the edge function
-      if (data.success) {
+      if (data?.success) {
         toast({
           title: "Sucesso!",
           description: data.message,
@@ -145,7 +144,7 @@ export const usePdfTools = () => {
 
         return true;
       } else {
-        throw new Error("Falha ao processar PDF");
+        throw new Error(data?.error || "Falha ao processar PDF");
       }
     } catch (error: any) {
       toast({

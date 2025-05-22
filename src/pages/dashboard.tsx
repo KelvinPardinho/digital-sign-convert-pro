@@ -1,3 +1,5 @@
+
+import { useEffect, useState } from "react";
 import { Layout } from "@/components/layout";
 import { useAuth } from "@/providers/AuthProvider";
 import {
@@ -28,112 +30,147 @@ import {
   Files,
 } from "lucide-react";
 import { UserCard } from "@/components/dashboard/UserCard";
+import { supabase } from "@/integrations/supabase/client";
+import { getUserConversions } from "@/utils/supabaseStorage";
 
-// Dados simulados para o dashboard
-const mockData = {
-  stats: {
-    uploaded: 18,
-    converted: 12,
-    signed: 8,
-    pending: 3,
-  },
-  recentDocuments: [
-    {
-      id: "doc-1",
-      name: "Contrato de Prestação de Serviços.pdf",
-      type: "pdf",
-      status: "signed",
-      date: "2023-05-13T10:30:00Z",
-    },
-    {
-      id: "doc-2",
-      name: "Proposta Comercial.docx",
-      type: "docx",
-      status: "converted",
-      date: "2023-05-12T14:22:00Z",
-    },
-    {
-      id: "doc-3",
-      name: "Relatorio_Anual.xlsx",
-      type: "xlsx",
-      status: "uploaded",
-      date: "2023-05-11T09:15:00Z",
-    },
-    {
-      id: "doc-4",
-      name: "Procuracao.pdf",
-      type: "pdf",
-      status: "pending",
-      date: "2023-05-10T16:45:00Z",
-    },
-  ],
-};
+// Type definitions for the dashboard data
+interface Conversion {
+  id: string;
+  original_filename: string;
+  original_format: string;
+  output_format: string;
+  output_url: string | null;
+  created_at: string;
+  status: string;
+}
 
-// Funções para formatar datas
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-};
-
-// Componente para renderizar o ícone de cada tipo de documento
-const DocIcon = ({ type }: { type: string }) => {
-  switch (type) {
-    case "pdf":
-      return <FileText className="h-5 w-5 text-primary" />;
-    case "docx":
-      return <FileText className="h-5 w-5 text-blue-600" />;
-    case "xlsx":
-      return <FileText className="h-5 w-5 text-green-600" />;
-    default:
-      return <FileText className="h-5 w-5" />;
-  }
-};
-
-// Componente para renderizar o status de cada documento
-const StatusBadge = ({ status }: { status: string }) => {
-  let classes = "inline-flex items-center px-2 py-1 rounded-full text-xs font-medium";
-  let icon = null;
-  let text = "";
-
-  switch (status) {
-    case "signed":
-      classes += " bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400";
-      icon = <Edit className="mr-1 h-3 w-3" />;
-      text = "Assinado";
-      break;
-    case "converted":
-      classes += " bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400";
-      icon = <Download className="mr-1 h-3 w-3" />;
-      text = "Convertido";
-      break;
-    case "uploaded":
-      classes += " bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-400";
-      icon = <Upload className="mr-1 h-3 w-3" />;
-      text = "Enviado";
-      break;
-    case "pending":
-      classes += " bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400";
-      icon = <Clock className="mr-1 h-3 w-3" />;
-      text = "Pendente";
-      break;
-    default:
-      classes += " bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-400";
-  }
-
-  return (
-    <span className={classes}>
-      {icon}
-      {text}
-    </span>
-  );
-};
+interface DashboardStats {
+  uploaded: number;
+  converted: number;
+  signed: number;
+  pending: number;
+}
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { stats, recentDocuments } = mockData;
+  const [stats, setStats] = useState<DashboardStats>({
+    uploaded: 0,
+    converted: 0,
+    signed: 0,
+    pending: 0,
+  });
+  const [recentDocuments, setRecentDocuments] = useState<Conversion[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch real data from Supabase
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!user) return;
+      
+      setIsLoading(true);
+      
+      try {
+        // Get user's conversions
+        const conversions = await getUserConversions(user.id);
+        
+        // Calculate stats from real data
+        const uploadedCount = conversions.length;
+        const convertedCount = conversions.filter(c => c.output_url).length;
+        
+        // For now, signing and pending are placeholders since we don't have that functionality yet
+        // In a real app, these would come from their respective tables
+        
+        setStats({
+          uploaded: uploadedCount,
+          converted: convertedCount,
+          signed: 0, // Would come from a real signatures table
+          pending: 0, // Would come from a real pending_operations table
+        });
+        
+        // Process conversions to match the format needed for display
+        const processedDocs = conversions.slice(0, 4).map(conv => ({
+          id: conv.id,
+          original_filename: conv.original_filename,
+          original_format: conv.original_format,
+          output_format: conv.output_format,
+          output_url: conv.output_url,
+          created_at: conv.created_at,
+          status: conv.output_url ? "converted" : "uploaded",
+          type: conv.original_format.toLowerCase(),
+        }));
+        
+        setRecentDocuments(processedDocs);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [user]);
+
+  // Funções para formatar datas
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  // Componente para renderizar o ícone de cada tipo de documento
+  const DocIcon = ({ type }: { type: string }) => {
+    switch (type) {
+      case "pdf":
+        return <FileText className="h-5 w-5 text-primary" />;
+      case "docx":
+        return <FileText className="h-5 w-5 text-blue-600" />;
+      case "xlsx":
+        return <FileText className="h-5 w-5 text-green-600" />;
+      default:
+        return <FileText className="h-5 w-5" />;
+    }
+  };
+
+  // Componente para renderizar o status de cada documento
+  const StatusBadge = ({ status }: { status: string }) => {
+    let classes = "inline-flex items-center px-2 py-1 rounded-full text-xs font-medium";
+    let icon = null;
+    let text = "";
+
+    switch (status) {
+      case "signed":
+        classes += " bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400";
+        icon = <Edit className="mr-1 h-3 w-3" />;
+        text = "Assinado";
+        break;
+      case "converted":
+        classes += " bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400";
+        icon = <Download className="mr-1 h-3 w-3" />;
+        text = "Convertido";
+        break;
+      case "uploaded":
+        classes += " bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-400";
+        icon = <Upload className="mr-1 h-3 w-3" />;
+        text = "Enviado";
+        break;
+      case "pending":
+        classes += " bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400";
+        icon = <Clock className="mr-1 h-3 w-3" />;
+        text = "Pendente";
+        break;
+      default:
+        classes += " bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-400";
+    }
+
+    return (
+      <span className={classes}>
+        {icon}
+        {text}
+      </span>
+    );
+  };
 
   // Cálculo do limite de uso para o plano gratuito
   const freeLimit = 5;
@@ -242,31 +279,56 @@ export default function Dashboard() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {recentDocuments.map((doc) => (
-                    <div key={doc.id} className="flex items-start justify-between">
-                      <div className="flex items-start gap-2">
-                        <div className="mt-1">
-                          <DocIcon type={doc.type} />
-                        </div>
-                        <div>
-                          <div className="font-medium truncate max-w-[280px]">
-                            {doc.name}
-                          </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <StatusBadge status={doc.status} />
-                            <span className="text-xs text-muted-foreground">
-                              {formatDate(doc.date)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <Button variant="ghost" size="icon">
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
+                {isLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-pulse text-center">
+                      <p className="text-muted-foreground">Carregando histórico...</p>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ) : recentDocuments.length > 0 ? (
+                  <div className="space-y-4">
+                    {recentDocuments.map((doc) => (
+                      <div key={doc.id} className="flex items-start justify-between">
+                        <div className="flex items-start gap-2">
+                          <div className="mt-1">
+                            <DocIcon type={doc.type} />
+                          </div>
+                          <div>
+                            <div className="font-medium truncate max-w-[280px]">
+                              {doc.original_filename}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <StatusBadge status={doc.status} />
+                              <span className="text-xs text-muted-foreground">
+                                {formatDate(doc.created_at)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => {
+                            if (doc.output_url) {
+                              window.open(doc.output_url, '_blank');
+                            }
+                          }}
+                          disabled={!doc.output_url}
+                          title={doc.output_url ? "Baixar arquivo" : "Arquivo não disponível"}
+                        >
+                          <ArrowRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 mx-auto text-muted-foreground opacity-50" />
+                    <p className="mt-2 text-muted-foreground">
+                      Nenhum documento encontrado. Comece convertendo ou enviando arquivos.
+                    </p>
+                  </div>
+                )}
                 <div className="mt-6 text-center">
                   <Link to="/history">
                     <Button variant="outline">
@@ -287,11 +349,11 @@ export default function Dashboard() {
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
                   <Link to="/converter">
-                    <div className="doc-card">
+                    <div className="p-4 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors">
                       <div className="p-2 bg-primary/10 rounded-md w-fit">
                         <Download className="h-5 w-5 text-primary" />
                       </div>
-                      <h3 className="font-medium">Converter</h3>
+                      <h3 className="font-medium mt-2">Converter</h3>
                       <p className="text-sm text-muted-foreground">
                         PDF ⬄ Word, Excel, Imagem
                       </p>
@@ -299,11 +361,11 @@ export default function Dashboard() {
                   </Link>
                   
                   <Link to="/sign">
-                    <div className="doc-card">
+                    <div className="p-4 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors">
                       <div className="p-2 bg-primary/10 rounded-md w-fit">
                         <Edit className="h-5 w-5 text-primary" />
                       </div>
-                      <h3 className="font-medium">Assinar</h3>
+                      <h3 className="font-medium mt-2">Assinar</h3>
                       <p className="text-sm text-muted-foreground">
                         Assinar documentos
                       </p>
@@ -311,11 +373,11 @@ export default function Dashboard() {
                   </Link>
                   
                   <Link to="/merge">
-                    <div className="doc-card">
+                    <div className="p-4 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors">
                       <div className="p-2 bg-primary/10 rounded-md w-fit">
                         <Files className="h-5 w-5 text-primary" />
                       </div>
-                      <h3 className="font-medium">Juntar PDFs</h3>
+                      <h3 className="font-medium mt-2">Juntar PDFs</h3>
                       <p className="text-sm text-muted-foreground">
                         Combinar vários PDFs
                       </p>
@@ -323,11 +385,11 @@ export default function Dashboard() {
                   </Link>
                   
                   <Link to="/cert-manager">
-                    <div className="doc-card">
+                    <div className="p-4 rounded-lg border hover:border-primary hover:bg-primary/5 transition-colors">
                       <div className="p-2 bg-primary/10 rounded-md w-fit">
                         <Lock className="h-5 w-5 text-primary" />
                       </div>
-                      <h3 className="font-medium">Certificados</h3>
+                      <h3 className="font-medium mt-2">Certificados</h3>
                       <p className="text-sm text-muted-foreground">
                         Gerenciar certificados
                       </p>
@@ -354,29 +416,63 @@ export default function Dashboard() {
                     <TabsTrigger value="signatures">Assinaturas</TabsTrigger>
                   </TabsList>
                   <TabsContent value="uploads" className="space-y-4">
-                    <div className="flex items-center">
-                      <div className="h-60 w-full flex items-center justify-center">
-                        <BarChart className="h-24 w-24 text-muted-foreground opacity-50" />
-                        <p className="text-muted-foreground ml-4">
-                          Estatísticas detalhadas disponíveis no MVP completo
+                    <div className="flex items-center justify-center h-[250px]">
+                      <div className="text-center space-y-2">
+                        <BarChart className="h-24 w-24 mx-auto text-muted-foreground opacity-50" />
+                        <p className="text-muted-foreground">
+                          {isLoading ? 
+                            "Carregando estatísticas..." : 
+                            stats.uploaded > 0 ? 
+                              `Você enviou ${stats.uploaded} arquivos` : 
+                              "Nenhum arquivo enviado ainda"
+                          }
                         </p>
+                        <Button 
+                          variant="outline" 
+                          className="mt-4"
+                          asChild
+                        >
+                          <Link to="/converter">Converter Arquivos</Link>
+                        </Button>
                       </div>
                     </div>
                   </TabsContent>
                   <TabsContent value="conversions" className="flex items-center justify-center h-[250px]">
-                    <div className="flex items-center">
-                      <BarChart className="h-24 w-24 text-muted-foreground opacity-50" />
-                      <p className="text-muted-foreground ml-4">
-                        Estatísticas detalhadas disponíveis no MVP completo
+                    <div className="text-center space-y-2">
+                      <BarChart className="h-24 w-24 mx-auto text-muted-foreground opacity-50" />
+                      <p className="text-muted-foreground">
+                        {isLoading ? 
+                          "Carregando estatísticas..." : 
+                          stats.converted > 0 ? 
+                            `Você converteu ${stats.converted} arquivos` : 
+                            "Nenhuma conversão realizada ainda"
+                        }
                       </p>
+                      <Button 
+                        variant="outline" 
+                        className="mt-4"
+                        asChild
+                      >
+                        <Link to="/converter">Converter Arquivos</Link>
+                      </Button>
                     </div>
                   </TabsContent>
                   <TabsContent value="signatures" className="flex items-center justify-center h-[250px]">
-                    <div className="flex items-center">
-                      <BarChart className="h-24 w-24 text-muted-foreground opacity-50" />
-                      <p className="text-muted-foreground ml-4">
-                        Estatísticas detalhadas disponíveis no MVP completo
+                    <div className="text-center space-y-2">
+                      <BarChart className="h-24 w-24 mx-auto text-muted-foreground opacity-50" />
+                      <p className="text-muted-foreground">
+                        {stats.signed > 0 ? 
+                          `Você assinou ${stats.signed} documentos` : 
+                          "Nenhuma assinatura realizada ainda"
+                        }
                       </p>
+                      <Button 
+                        variant="outline" 
+                        className="mt-4"
+                        asChild
+                      >
+                        <Link to="/sign">Assinar Documentos</Link>
+                      </Button>
                     </div>
                   </TabsContent>
                 </Tabs>
